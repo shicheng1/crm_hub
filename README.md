@@ -127,7 +127,27 @@ npm run dev
 # 前端启动在 http://localhost:5173
 ```
 
-### 4. 测试账号
+### 4. 生产化 Docker Compose 演示
+```bash
+cp .env.example .env
+# 修改 .env 中的密码和 JWT_SECRET
+docker compose up -d --build
+```
+
+访问地址：
+- 前端：http://localhost
+- 后端健康检查：http://localhost:8080/actuator/health
+- RabbitMQ 管理台：http://localhost:15672
+
+部署细节见：`docs/deployment.md`
+
+### 5. 测试与构建
+```bash
+cd backend && mvn test
+cd frontend && npm run build
+```
+
+### 6. 测试账号
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
 | admin | 123456 | 审批人 |
