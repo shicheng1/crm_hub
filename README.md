@@ -154,6 +154,22 @@ cd frontend && npm run build
 | user1 | 123456 | 普通用户 |
 | user2 | 123456 | 普通用户 |
 
+## 文档
+
+| 文档 | 路径 |
+|------|------|
+| API 接口文档 | `docs/api.md` |
+| 架构文档 | `docs/architecture.md` |
+| 数据库设计 | `docs/database.md` |
+| 部署说明 | `docs/deployment.md` |
+| 面试讲解稿 | `docs/interview.md` |
+| 演示脚本 | `docs/demo-script.md` |
+| 安全文档 | `docs/security.md` |
+| 性能优化 | `docs/performance.md` |
+| 测试说明 | `docs/testing.md` |
+| 故障排查 | `docs/troubleshooting.md` |
+| 生产级升级路线图 | `docs/plans/production-upgrade-roadmap.md` |
+
 ## 技术亮点（面试重点）
 
 ### 1. 分布式锁实现（RedisDistributedLock）
