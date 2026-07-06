@@ -1,5 +1,6 @@
 package com.zmd.order.websocket;
 
+import com.zmd.order.entity.WorkOrder;
 import com.zmd.order.mq.ApprovalMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,5 +43,23 @@ public class NotificationService {
 
         log.info("WebSocket 通知已推送到 {}, userId={}, orderId={}, result={}",
                 destination, message.getCreatorId(), message.getOrderId(), message.getResult());
+    }
+
+    /**
+     * 向当前审批人推送超时催办通知
+     */
+    public void notifyApproverReminder(Long approverId, WorkOrder order) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", "APPROVAL_REMINDER");
+        payload.put("orderId", order.getId());
+        payload.put("orderTitle", order.getTitle());
+        payload.put("currentStep", order.getCurrentStep());
+        payload.put("message", "工单已超过24小时未处理，请及时审批");
+
+        String destination = "/topic/notifications/" + approverId;
+        messagingTemplate.convertAndSend(destination, payload);
+
+        log.info("WebSocket 催办通知已推送到 {}, approverId={}, orderId={}",
+                destination, approverId, order.getId());
     }
 }

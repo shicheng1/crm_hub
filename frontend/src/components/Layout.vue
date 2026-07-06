@@ -30,6 +30,10 @@
           <el-icon><Share /></el-icon>
           <span>审批流管理</span>
         </el-menu-item>
+        <el-menu-item index="/users">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -43,7 +47,7 @@
               <Bell />
             </el-icon>
           </el-badge>
-          <el-tag>{{ user?.role === 'APPROVER' ? '审批人' : '普通用户' }}</el-tag>
+          <el-tag>{{ { ADMIN: '管理员', APPROVER: '审批人', USER: '普通用户' }[user?.role] || '普通用户' }}</el-tag>
           <span style="font-weight: bold;">{{ user?.username }}</span>
           <el-button type="info" size="small" @click="handleLogout">退出</el-button>
         </div>

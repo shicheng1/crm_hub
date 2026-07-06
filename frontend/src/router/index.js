@@ -19,6 +19,7 @@ const routes = [
       { path: 'todo', name: 'TodoList', component: () => import('../views/TodoList.vue'), meta: { title: '待我审批' } },
       { path: 'done', name: 'DoneList', component: () => import('../views/DoneList.vue'), meta: { title: '我已审批' } },
       { path: 'flows', name: 'FlowManage', component: () => import('../views/FlowManage.vue'), meta: { title: '审批流管理' } },
+      { path: 'users', name: 'UserManage', component: () => import('../views/UserManage.vue'), meta: { title: '用户管理' } },
     ]
   },
   {

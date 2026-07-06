@@ -16,6 +16,8 @@ public class ApprovalFlowStep {
     private Long flowId;
     private Integer stepOrder;
     private String stepName;
+    /** 审批模式：ANY=任一审批人通过即可，ALL=全部审批人通过才进入下一步 */
+    private String approveMode;
     /** @deprecated 已迁移到 approval_step_approver 表，保留兼容 */
     private Long approverId;
     private LocalDateTime createTime;

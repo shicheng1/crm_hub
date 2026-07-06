@@ -23,6 +23,7 @@
       <el-steps :active="-1" finish-status="success" simple>
         <el-step v-for="step in flow.steps" :key="step.id" :title="step.stepName">
           <template #description>
+            <div>模式：{{ step.approveMode === 'ALL' ? '会签' : '或签' }}</div>
             <div>审批人：{{ formatApprovers(step) }}</div>
           </template>
         </el-step>
@@ -50,10 +51,14 @@
           <div style="display: flex; gap: 8px; margin-bottom: 8px;">
             <el-tag>步骤 {{ idx + 1 }}</el-tag>
             <el-input v-model="step.stepName" placeholder="步骤名称" style="flex: 1" />
+            <el-select v-model="step.approveMode" placeholder="审批模式" style="width: 120px">
+              <el-option label="或签" value="ANY" />
+              <el-option label="会签" value="ALL" />
+            </el-select>
             <el-button type="danger" link @click="removeStep(idx)" v-if="form.steps.length > 1">删除</el-button>
           </div>
-          <el-select v-model="step.approverIds" multiple placeholder="选择审批人（可多选，任一通过即可）" style="width: 100%">
-            <el-option v-for="u in users" :key="u.id" :label="u.username + (u.role === 'APPROVER' ? '（审批人）' : '')" :value="u.id" />
+          <el-select v-model="step.approverIds" multiple :placeholder="step.approveMode === 'ALL' ? '选择审批人（会签：全部通过才进入下一步）' : '选择审批人（或签：任一通过即可）'" style="width: 100%">
+            <el-option v-for="u in users" :key="u.id" :label="u.username + ({ ADMIN: '（管理员）', APPROVER: '（审批人）', USER: '（普通用户）' }[u.role] || '')" :value="u.id" />
           </el-select>
         </div>
         <el-button @click="addStep" :icon="Plus">添加步骤</el-button>
@@ -81,10 +86,11 @@ const form = ref({ name: '', description: '', rejectMode: 'ORIGIN', steps: [] })
 
 const formatApprovers = (step) => {
   if (!step.approvers || step.approvers.length === 0) return '未配置'
+  const separator = step.approveMode === 'ALL' ? ' 且 ' : ' 或 '
   return step.approvers.map(a => {
     const u = users.value.find(x => x.id === a.userId)
     return u ? u.username : ('ID:' + a.userId)
-  }).join(' 或 ')
+  }).join(separator)
 }
 
 const loadFlows = async () => {
@@ -97,13 +103,13 @@ const openCreate = () => {
     name: '',
     description: '',
     rejectMode: 'ORIGIN',
-    steps: [{ stepName: '', approverIds: [] }]
+    steps: [{ stepName: '', approveMode: 'ANY', approverIds: [] }]
   }
   dialogVisible.value = true
 }
 
 const addStep = () => {
-  form.value.steps.push({ stepName: '', approverIds: [] })
+  form.value.steps.push({ stepName: '', approveMode: 'ANY', approverIds: [] })
 }
 
 const removeStep = (idx) => {
@@ -128,6 +134,7 @@ const submit = async () => {
       steps: form.value.steps.map((s, i) => ({
         stepOrder: i + 1,
         stepName: s.stepName,
+        approveMode: s.approveMode || 'ANY',
         approvers: s.approverIds.map(uid => ({ userId: uid }))
       }))
     }

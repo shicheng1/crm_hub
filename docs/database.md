@@ -30,8 +30,9 @@
 | `id` | `BIGINT` | 主键 |
 | `username` | `VARCHAR(50)` | 用户名，唯一 |
 | `password` | `VARCHAR(100)` | 密码 |
-| `role` | `VARCHAR(20)` | 角色：`USER` / `APPROVER` |
+| `role` | `VARCHAR(20)` | 角色：`ADMIN` / `APPROVER` / `USER` |
 | `dept_id` | `BIGINT` | 部门 ID |
+| `status` | `TINYINT` | `1` 启用，`0` 禁用 |
 | `create_time` | `DATETIME` | 创建时间 |
 | `update_time` | `DATETIME` | 更新时间 |
 
@@ -64,6 +65,7 @@
 | `current_step` | `INT` | 当前步骤序号 |
 | `submit_step` | `INT` | 提交步骤序号 |
 | `dept_id` | `BIGINT` | 部门 ID |
+| `status` | `TINYINT` | `1` 启用，`0` 禁用 |
 | `create_time` | `DATETIME` | 创建时间 |
 | `update_time` | `DATETIME` | 更新时间 |
 | `approve_time` | `DATETIME` | 审批时间 |

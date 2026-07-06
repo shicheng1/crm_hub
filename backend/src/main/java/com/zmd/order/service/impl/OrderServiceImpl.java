@@ -3,6 +3,8 @@ package com.zmd.order.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zmd.order.auth.LoginUser;
 import com.zmd.order.cache.OrderCacheService;
 import com.zmd.order.common.BusinessException;
@@ -16,6 +18,7 @@ import com.zmd.order.mq.ApprovalMessage;
 import com.zmd.order.mq.ApprovalProducer;
 import com.zmd.order.service.DashboardService;
 import com.zmd.order.service.OrderService;
+import com.zmd.order.statemachine.OrderStatusTransition;
 import com.zmd.order.websocket.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,8 +54,10 @@ public class OrderServiceImpl implements OrderService {
     private final ApprovalRecordMapper recordMapper;
     private final OperationLogMapper logMapper;
     private final ApprovalFlowMapper flowMapper;
+    private final OrderFlowSnapshotMapper flowSnapshotMapper;
     private final RedisDistributedLock redisLock;
     private final OrderCacheService orderCacheService;
+    private final ObjectMapper objectMapper;
     private final ObjectProvider<ApprovalProducer> approvalProducerProvider;
     private final NotificationService notificationService;
     private final DashboardService dashboardService;
@@ -81,6 +86,7 @@ public class OrderServiceImpl implements OrderService {
             order.setDeptId(creator != null ? creator.getDeptId() : null);
             order.setCreateTime(LocalDateTime.now());
             orderMapper.insert(order);
+            createFlowSnapshot(order.getId(), dto.getFlowId());
 
             saveLog(order.getId(), loginUser, "CREATE", "创建工单");
             log.info("创建工单, orderId={}, flowId={}", order.getId(), dto.getFlowId());
@@ -112,7 +118,7 @@ public class OrderServiceImpl implements OrderService {
             restartStep = 1; // RESTART
         }
 
-        order.setStatus(Constants.STATUS_REVIEWING);
+        transitStatus(order, Constants.STATUS_REVIEWING);
         order.setCurrentStep(restartStep);
         orderMapper.updateById(order);
 
@@ -204,13 +210,13 @@ public class OrderServiceImpl implements OrderService {
             if (order.getCurrentStep() == null || order.getCurrentStep() == 0) {
                 order.setCurrentStep(1);
                 order.setSubmitStep(1);
-                order.setStatus(Constants.STATUS_REVIEWING);
+                transitStatus(order, Constants.STATUS_REVIEWING);
             }
 
             // 验证：当前步骤是否有此人审批权限
-            ApprovalFlowStep currentStep = getStep(order.getFlowId(), order.getCurrentStep());
+            ApprovalFlowStep currentStep = getStep(order, order.getCurrentStep());
             if (currentStep == null) throw new BusinessException("审批流配置异常");
-            if (!isStepApprover(currentStep.getId(), loginUser.getUserId())) {
+            if (!isStepApprover(currentStep, loginUser.getUserId())) {
                 throw new BusinessException("您不是当前步骤的审批人");
             }
 
@@ -243,12 +249,25 @@ public class OrderServiceImpl implements OrderService {
     // ==================== 审批通过逻辑 ====================
 
     private void handleApproved(WorkOrder order, ApprovalFlowStep currentStep, LoginUser loginUser) {
+        String approveMode = currentStep.getApproveMode() != null ? currentStep.getApproveMode() : "ANY";
+        if ("ALL".equalsIgnoreCase(approveMode) && !isAllApproversApproved(order.getId(), currentStep)) {
+            transitStatus(order, Constants.STATUS_REVIEWING);
+            order.setCurrentStep(currentStep.getStepOrder());
+            orderMapper.updateById(order);
+            saveLog(order.getId(), loginUser, "APPROVE",
+                    "通过 [" + currentStep.getStepName() + "]，会签模式，等待其他审批人处理");
+            orderCacheService.evictOrder(order.getId());
+            dashboardService.evictStatsCache();
+            log.info("会签步骤部分通过, orderId={}, stepId={}, approverId={}", order.getId(), currentStep.getId(), loginUser.getUserId());
+            return;
+        }
+
         // 查找下一步
-        ApprovalFlowStep nextStep = getNextStep(order.getFlowId(), currentStep.getStepOrder());
+        ApprovalFlowStep nextStep = getNextStep(order, currentStep.getStepOrder());
 
         if (nextStep == null) {
             // === 最后一步通过 → 工单完成 ===
-            order.setStatus(Constants.STATUS_APPROVED);
+            transitStatus(order, Constants.STATUS_APPROVED);
             order.setApproveTime(LocalDateTime.now());
             order.setApproverId(loginUser.getUserId());
             orderMapper.updateById(order);
@@ -256,11 +275,11 @@ public class OrderServiceImpl implements OrderService {
             log.info("工单审批完成, orderId={}", order.getId());
         } else {
             // === 跳过逻辑：如果下一步审批人和当前审批人相同，自动跳过 ===
-            nextStep = skipDuplicateApprovers(order.getId(), order.getFlowId(), nextStep.getStepOrder(), loginUser.getUserId());
+            nextStep = skipDuplicateApprovers(order, nextStep.getStepOrder(), loginUser.getUserId());
 
             if (nextStep == null) {
                 // 跳过所有剩余步骤后，审批完成
-                order.setStatus(Constants.STATUS_APPROVED);
+                transitStatus(order, Constants.STATUS_APPROVED);
                 order.setApproveTime(LocalDateTime.now());
                 order.setApproverId(loginUser.getUserId());
                 orderMapper.updateById(order);
@@ -268,7 +287,7 @@ public class OrderServiceImpl implements OrderService {
             } else {
                 // 流转到下一步
                 order.setCurrentStep(nextStep.getStepOrder());
-                order.setStatus(Constants.STATUS_REVIEWING);
+                transitStatus(order, Constants.STATUS_REVIEWING);
                 orderMapper.updateById(order);
                 saveLog(order.getId(), loginUser, "APPROVE",
                         "通过 [" + currentStep.getStepName() + "]，流转至 [" + nextStep.getStepName() + "]");
@@ -290,21 +309,21 @@ public class OrderServiceImpl implements OrderService {
         switch (rejectMode) {
             case "RESTART":
                 // 回到第一步重新走
-                order.setStatus(Constants.STATUS_REVIEWING);
+                transitStatus(order, Constants.STATUS_REVIEWING);
                 order.setCurrentStep(1);
                 logDetail = "驳回 [" + currentStep.getStepName() + "]，策略=RESTART，回到第一步重新审批";
                 break;
 
             case "PREVIOUS":
                 // 回到上一步
-                ApprovalFlowStep prevStep = getPrevStep(order.getFlowId(), currentStep.getStepOrder());
+                ApprovalFlowStep prevStep = getPrevStep(order, currentStep.getStepOrder());
                 if (prevStep != null) {
                     order.setCurrentStep(prevStep.getStepOrder());
-                    order.setStatus(Constants.STATUS_REVIEWING);
+                    transitStatus(order, Constants.STATUS_REVIEWING);
                     logDetail = "驳回 [" + currentStep.getStepName() + "]，策略=PREVIOUS，退回 [" + prevStep.getStepName() + "]";
                 } else {
                     // 没有上一步了，退回到发起人
-                    order.setStatus(Constants.STATUS_RETURNED);
+                    transitStatus(order, Constants.STATUS_RETURNED);
                     order.setCurrentStep(0);
                     logDetail = "驳回 [" + currentStep.getStepName() + "]，策略=PREVIOUS，无上一步，退回发起人";
                 }
@@ -313,7 +332,7 @@ public class OrderServiceImpl implements OrderService {
             case "ORIGIN":
             default:
                 // 退回发起人重新提交
-                order.setStatus(Constants.STATUS_RETURNED);
+                transitStatus(order, Constants.STATUS_RETURNED);
                 order.setCurrentStep(0);
                 logDetail = "驳回 [" + currentStep.getStepName() + "]，策略=ORIGIN，退回发起人重新提交";
                 break;
@@ -333,11 +352,72 @@ public class OrderServiceImpl implements OrderService {
 
     // ==================== 内部工具方法 ====================
 
-    /** 判断某人是否是当前步骤的审批人 */
-    private boolean isStepApprover(Long stepId, Long userId) {
+    /** 创建工单时保存审批流快照，防止流程后续修改影响历史工单 */
+    private void createFlowSnapshot(Long orderId, Long flowId) {
+        ApprovalFlow flow = flowMapper.selectById(flowId);
+        if (flow == null) {
+            throw new BusinessException("审批流不存在");
+        }
+        flow.setSteps(loadRuntimeStepsWithApprovers(flowId));
+        OrderFlowSnapshot snapshot = new OrderFlowSnapshot();
+        snapshot.setOrderId(orderId);
+        snapshot.setFlowId(flowId);
+        try {
+            snapshot.setSnapshotJson(objectMapper.writeValueAsString(flow));
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(500, "审批流快照创建失败");
+        }
+        snapshot.setCreateTime(LocalDateTime.now());
+        flowSnapshotMapper.insert(snapshot);
+    }
+
+    private ApprovalFlow getFlowSnapshot(WorkOrder order) {
+        OrderFlowSnapshot snapshot = flowSnapshotMapper.selectOne(
+                new LambdaQueryWrapper<OrderFlowSnapshot>()
+                        .eq(OrderFlowSnapshot::getOrderId, order.getId()));
+        if (snapshot == null || snapshot.getSnapshotJson() == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(snapshot.getSnapshotJson(), ApprovalFlow.class);
+        } catch (Exception e) {
+            log.warn("审批流快照反序列化失败, orderId={}", order.getId(), e);
+            return null;
+        }
+    }
+
+    private List<ApprovalFlowStep> getSnapshotSteps(WorkOrder order) {
+        ApprovalFlow snapshot = getFlowSnapshot(order);
+        return snapshot != null && snapshot.getSteps() != null ? snapshot.getSteps() : null;
+    }
+
+    private List<ApprovalFlowStep> loadRuntimeStepsWithApprovers(Long flowId) {
+        List<ApprovalFlowStep> steps = stepMapper.selectList(
+                new LambdaQueryWrapper<ApprovalFlowStep>()
+                        .eq(ApprovalFlowStep::getFlowId, flowId)
+                        .orderByAsc(ApprovalFlowStep::getStepOrder));
+        if (!steps.isEmpty()) {
+            List<Long> stepIds = steps.stream().map(ApprovalFlowStep::getId).collect(Collectors.toList());
+            List<ApprovalStepApprover> allApprovers = stepApproverMapper.selectList(
+                    new LambdaQueryWrapper<ApprovalStepApprover>()
+                            .in(ApprovalStepApprover::getStepId, stepIds));
+            Map<Long, List<ApprovalStepApprover>> approverMap = allApprovers.stream()
+                    .collect(Collectors.groupingBy(ApprovalStepApprover::getStepId));
+            for (ApprovalFlowStep step : steps) {
+                step.setApprovers(approverMap.getOrDefault(step.getId(), new ArrayList<>()));
+            }
+        }
+        return steps;
+    }
+
+    /** 判断某人是否是当前步骤的审批人（兼容快照和运行时配置） */
+    private boolean isStepApprover(ApprovalFlowStep step, Long userId) {
+        if (step.getApprovers() != null) {
+            return step.getApprovers().stream().anyMatch(a -> userId.equals(a.getUserId()));
+        }
         return stepApproverMapper.selectCount(
                 new LambdaQueryWrapper<ApprovalStepApprover>()
-                        .eq(ApprovalStepApprover::getStepId, stepId)
+                        .eq(ApprovalStepApprover::getStepId, step.getId())
                         .eq(ApprovalStepApprover::getUserId, userId)) > 0;
     }
 
@@ -350,79 +430,117 @@ public class OrderServiceImpl implements OrderService {
                         .eq(ApprovalRecord::getApproverId, userId)) > 0;
     }
 
+    /** 会签模式：判断当前步骤所有审批人是否都已通过 */
+    private boolean isAllApproversApproved(Long orderId, ApprovalFlowStep step) {
+        long approverCount;
+        if (step.getApprovers() != null) {
+            approverCount = step.getApprovers().size();
+        } else {
+            approverCount = stepApproverMapper.selectCount(
+                    new LambdaQueryWrapper<ApprovalStepApprover>()
+                            .eq(ApprovalStepApprover::getStepId, step.getId()));
+        }
+        if (approverCount == 0) {
+            return false;
+        }
+        long approvedCount = recordMapper.selectCount(
+                new LambdaQueryWrapper<ApprovalRecord>()
+                        .eq(ApprovalRecord::getOrderId, orderId)
+                        .eq(ApprovalRecord::getStepId, step.getId())
+                        .eq(ApprovalRecord::getResult, "APPROVED"));
+        return approvedCount >= approverCount;
+    }
+
     /** 判断是否轮到此人审批（待办列表用） */
     private boolean isMyTurn(WorkOrder order, Long userId) {
         if (order.getCurrentStep() == null || order.getCurrentStep() == 0) return false;
-        ApprovalFlowStep step = getStep(order.getFlowId(), order.getCurrentStep());
+        ApprovalFlowStep step = getStep(order, order.getCurrentStep());
         if (step == null) return false;
-        return isStepApprover(step.getId(), userId) && !hasApproved(order.getId(), step.getId(), userId);
+        return isStepApprover(step, userId) && !hasApproved(order.getId(), step.getId(), userId);
     }
 
     /** 跳过审批人相同的连续步骤 */
-    private ApprovalFlowStep skipDuplicateApprovers(Long orderId, Long flowId, int fromStepOrder, Long approverId) {
-        ApprovalFlowStep step = getStep(flowId, fromStepOrder);
-        while (step != null && isStepApprover(step.getId(), approverId) && !hasApproved(orderId, step.getId(), approverId)) {
-            log.info("跳过审批人相同的步骤: orderId={}, flowId={}, stepOrder={}, approverId={}", orderId, flowId, step.getStepOrder(), approverId);
-            step = getNextStep(flowId, step.getStepOrder());
+    private ApprovalFlowStep skipDuplicateApprovers(WorkOrder order, int fromStepOrder, Long approverId) {
+        ApprovalFlowStep step = getStep(order, fromStepOrder);
+        while (step != null && isStepApprover(step, approverId) && !hasApproved(order.getId(), step.getId(), approverId)) {
+            log.info("跳过审批人相同的步骤: orderId={}, flowId={}, stepOrder={}, approverId={}", order.getId(), order.getFlowId(), step.getStepOrder(), approverId);
+            step = getNextStep(order, step.getStepOrder());
         }
         return step;
     }
 
-    private ApprovalFlowStep getStep(Long flowId, int stepOrder) {
+    private ApprovalFlowStep getStep(WorkOrder order, int stepOrder) {
+        List<ApprovalFlowStep> snapshotSteps = getSnapshotSteps(order);
+        if (snapshotSteps != null) {
+            return snapshotSteps.stream()
+                    .filter(s -> s.getStepOrder() != null && s.getStepOrder() == stepOrder)
+                    .findFirst()
+                    .orElse(null);
+        }
         return stepMapper.selectOne(
                 new LambdaQueryWrapper<ApprovalFlowStep>()
-                        .eq(ApprovalFlowStep::getFlowId, flowId)
+                        .eq(ApprovalFlowStep::getFlowId, order.getFlowId())
                         .eq(ApprovalFlowStep::getStepOrder, stepOrder));
     }
 
-    private ApprovalFlowStep getNextStep(Long flowId, int currentStepOrder) {
+    private ApprovalFlowStep getNextStep(WorkOrder order, int currentStepOrder) {
+        List<ApprovalFlowStep> snapshotSteps = getSnapshotSteps(order);
+        if (snapshotSteps != null) {
+            return snapshotSteps.stream()
+                    .filter(s -> s.getStepOrder() != null && s.getStepOrder() > currentStepOrder)
+                    .min(java.util.Comparator.comparing(ApprovalFlowStep::getStepOrder))
+                    .orElse(null);
+        }
         return stepMapper.selectOne(
                 new LambdaQueryWrapper<ApprovalFlowStep>()
-                        .eq(ApprovalFlowStep::getFlowId, flowId)
+                        .eq(ApprovalFlowStep::getFlowId, order.getFlowId())
                         .gt(ApprovalFlowStep::getStepOrder, currentStepOrder)
                         .orderByAsc(ApprovalFlowStep::getStepOrder)
                         .last("LIMIT 1"));
     }
 
-    private ApprovalFlowStep getPrevStep(Long flowId, int currentStepOrder) {
+    private ApprovalFlowStep getPrevStep(WorkOrder order, int currentStepOrder) {
+        List<ApprovalFlowStep> snapshotSteps = getSnapshotSteps(order);
+        if (snapshotSteps != null) {
+            return snapshotSteps.stream()
+                    .filter(s -> s.getStepOrder() != null && s.getStepOrder() < currentStepOrder)
+                    .max(java.util.Comparator.comparing(ApprovalFlowStep::getStepOrder))
+                    .orElse(null);
+        }
         return stepMapper.selectOne(
                 new LambdaQueryWrapper<ApprovalFlowStep>()
-                        .eq(ApprovalFlowStep::getFlowId, flowId)
+                        .eq(ApprovalFlowStep::getFlowId, order.getFlowId())
                         .lt(ApprovalFlowStep::getStepOrder, currentStepOrder)
                         .orderByDesc(ApprovalFlowStep::getStepOrder)
                         .last("LIMIT 1"));
     }
 
     private String getRejectMode(WorkOrder order) {
+        ApprovalFlow snapshot = getFlowSnapshot(order);
+        if (snapshot != null && snapshot.getRejectMode() != null) {
+            return snapshot.getRejectMode();
+        }
         ApprovalFlow flow = flowMapper.selectById(order.getFlowId());
         return flow != null && flow.getRejectMode() != null ? flow.getRejectMode() : "ORIGIN";
     }
 
     private WorkOrder enrichOrder(WorkOrder order) {
         if (order.getFlowId() != null) {
-            List<ApprovalFlowStep> steps = stepMapper.selectList(
-                    new LambdaQueryWrapper<ApprovalFlowStep>()
-                            .eq(ApprovalFlowStep::getFlowId, order.getFlowId())
-                            .orderByAsc(ApprovalFlowStep::getStepOrder));
-            // 批量加载所有步骤的审批人（避免 N+1 查询）
-            if (!steps.isEmpty()) {
-                List<Long> stepIds = steps.stream().map(ApprovalFlowStep::getId).collect(Collectors.toList());
-                List<ApprovalStepApprover> allApprovers = stepApproverMapper.selectList(
-                        new LambdaQueryWrapper<ApprovalStepApprover>()
-                                .in(ApprovalStepApprover::getStepId, stepIds));
-                Map<Long, List<ApprovalStepApprover>> approverMap = allApprovers.stream()
-                        .collect(Collectors.groupingBy(ApprovalStepApprover::getStepId));
-                for (ApprovalFlowStep step : steps) {
-                    step.setApprovers(approverMap.getOrDefault(step.getId(), new ArrayList<>()));
+            ApprovalFlow snapshot = getFlowSnapshot(order);
+            List<ApprovalFlowStep> steps;
+            if (snapshot != null) {
+                steps = snapshot.getSteps() != null ? snapshot.getSteps() : new ArrayList<>();
+                order.setFlowName(snapshot.getName());
+                order.setRejectMode(snapshot.getRejectMode());
+            } else {
+                steps = loadRuntimeStepsWithApprovers(order.getFlowId());
+                ApprovalFlow flow = flowMapper.selectById(order.getFlowId());
+                if (flow != null) {
+                    order.setFlowName(flow.getName());
+                    order.setRejectMode(flow.getRejectMode());
                 }
             }
             order.setFlowSteps(steps);
-
-            ApprovalFlow flow = flowMapper.selectById(order.getFlowId());
-            if (flow != null) {
-                order.setFlowName(flow.getName());
-                order.setRejectMode(flow.getRejectMode());
-            }
         }
         order.setRecords(recordMapper.selectList(
                 new LambdaQueryWrapper<ApprovalRecord>()
@@ -431,6 +549,11 @@ public class OrderServiceImpl implements OrderService {
         User creator = userMapper.selectById(order.getCreatorId());
         order.setCreatorName(creator != null ? creator.getUsername() : "未知");
         return order;
+    }
+
+    private void transitStatus(WorkOrder order, int targetStatus) {
+        OrderStatusTransition.assertCanTransit(order.getStatus(), targetStatus);
+        order.setStatus(targetStatus);
     }
 
     private void saveLog(Long orderId, LoginUser loginUser, String operation, String detail) {

@@ -673,7 +673,244 @@
 }
 ```
 
-## 16) 看板统计
+
+## 16) 用户分页
+
+### `GET /api/users/page`
+
+**Query 参数**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `page` | 否 | 页码，默认 `1` |
+| `size` | 否 | 每页数量，默认 `10` |
+| `username` | 否 | 用户名关键字 |
+| `role` | 否 | `ADMIN` / `APPROVER` / `USER` |
+| `deptId` | 否 | 部门 ID |
+| `status` | 否 | `1` 启用，`0` 禁用 |
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `records` | 用户列表 |
+| `total` | 总条数 |
+| `size` | 每页数量 |
+| `current` | 当前页码 |
+| `pages` | 总页数 |
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "records": [
+      {
+        "id": 1,
+        "username": "admin",
+        "password": null,
+        "role": "ADMIN",
+        "deptId": 3,
+        "status": 1,
+        "deptName": "管理层",
+        "createTime": "2026-07-06 09:00:00",
+        "updateTime": "2026-07-06 09:00:00"
+      }
+    ],
+    "total": 1,
+    "size": 10,
+    "current": 1,
+    "pages": 1
+  }
+}
+```
+
+## 17) 启用用户列表
+
+### `GET /api/users/list`
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `id` | 用户 ID |
+| `username` | 用户名 |
+| `role` | 角色 |
+| `deptId` | 部门 ID |
+| `status` | 状态 |
+| `deptName` | 部门名称 |
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": [
+    {
+      "id": 2,
+      "username": "user1",
+      "password": null,
+      "role": "USER",
+      "deptId": 1,
+      "status": 1,
+      "deptName": "技术部",
+      "createTime": "2026-07-06 09:00:00",
+      "updateTime": "2026-07-06 09:00:00"
+    }
+  ]
+}
+```
+
+## 18) 创建用户
+
+### `POST /api/users`
+
+**请求体**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `username` | 是 | 用户名 |
+| `password` | 是 | 初始密码 |
+| `role` | 是 | `ADMIN` / `APPROVER` / `USER` |
+| `deptId` | 否 | 部门 ID |
+| `status` | 是 | `1` 启用，`0` 禁用 |
+
+```json
+{
+  "username": "manager1",
+  "password": "123456",
+  "role": "APPROVER",
+  "deptId": 1,
+  "status": 1
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `data` | 用户 ID |
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": 4
+}
+```
+
+## 19) 更新用户
+
+### `PUT /api/users/{id}`
+
+**Path 参数**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `id` | 是 | 用户 ID |
+
+**请求体**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `role` | 是 | `ADMIN` / `APPROVER` / `USER` |
+| `deptId` | 否 | 部门 ID |
+| `status` | 否 | `1` 启用，`0` 禁用 |
+
+```json
+{
+  "role": "APPROVER",
+  "deptId": 1,
+  "status": 1
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `data` | 固定为 `null` |
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": null
+}
+```
+
+## 20) 更新用户状态
+
+### `PUT /api/users/{id}/status`
+
+**Path 参数**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `id` | 是 | 用户 ID |
+
+**请求体**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `status` | 是 | `1` 启用，`0` 禁用 |
+
+```json
+{
+  "status": 0
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `data` | 固定为 `null` |
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": null
+}
+```
+
+## 21) 重置用户密码
+
+### `PUT /api/users/{id}/password`
+
+**Path 参数**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `id` | 是 | 用户 ID |
+
+**请求体**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `password` | 是 | 新密码 |
+
+```json
+{
+  "password": "123456"
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `data` | 固定为 `null` |
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": null
+}
+```
+
+## 22) 看板统计
 
 ### `GET /api/dashboard/stats`
 
@@ -709,7 +946,7 @@
 }
 ```
 
-## 17) 看板趋势
+## 23) 看板趋势
 
 ### `GET /api/dashboard/trend`
 

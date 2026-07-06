@@ -25,10 +25,12 @@ public class JwtUtil {
 
     private final SecretKey key;
     private final long expireHours;
+    private final long refreshExpireDays;
 
     public JwtUtil(
             @Value("${jwt.secret:zmd-order-approval-secret-key-2024-default}") String secret,
-            @Value("${jwt.expire-hours:24}") long expireHours) {
+            @Value("${jwt.expire-hours:24}") long expireHours,
+            @Value("${jwt.refresh-expire-days:7}") long refreshExpireDays) {
         // 密钥长度不足 32 字节时补齐（HS256 要求至少 256 bit）
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
@@ -37,9 +39,18 @@ public class JwtUtil {
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
         this.expireHours = expireHours;
+        this.refreshExpireDays = refreshExpireDays;
     }
 
     public String generateToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, expireHours * 3600 * 1000);
+    }
+
+    public String generateRefreshToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, refreshExpireDays * 24 * 3600 * 1000);
+    }
+
+    private String generateToken(Long userId, String username, String role, long expireMillis) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
@@ -48,7 +59,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expireHours * 3600 * 1000))
+                .setExpiration(new Date(System.currentTimeMillis() + expireMillis))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -73,5 +84,9 @@ public class JwtUtil {
     /** token 过期时间（小时），供外部同步 Redis TTL 使用 */
     public long getExpireHours() {
         return expireHours;
+    }
+
+    public long getRefreshExpireDays() {
+        return refreshExpireDays;
     }
 }

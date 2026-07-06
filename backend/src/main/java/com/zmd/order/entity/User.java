@@ -16,6 +16,8 @@ public class User {
     private String password;
     private String role;
     private Long deptId;
+    /** 1启用 0禁用 */
+    private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 

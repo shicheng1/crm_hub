@@ -7,10 +7,12 @@ import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.Arrays;
 
 /**
  * JWT 认证拦截器
@@ -65,6 +67,23 @@ public class AuthInterceptor implements HandlerInterceptor {
         loginUser.setRole(claims.get("role", String.class));
         LoginUser.set(loginUser);
 
+        // 接口级权限检查
+        if (handler instanceof HandlerMethod) {
+            HandlerMethod handlerMethod = (HandlerMethod) handler;
+            RequireRole requireRole = handlerMethod.getMethodAnnotation(RequireRole.class);
+            if (requireRole == null) {
+                requireRole = handlerMethod.getBeanType().getAnnotation(RequireRole.class);
+            }
+            if (requireRole != null) {
+                String userRole = loginUser.getRole();
+                boolean hasRole = Arrays.asList(requireRole.value()).contains(userRole);
+                if (!hasRole) {
+                    writeError(response, 403, "权限不足");
+                    return false;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -75,7 +94,14 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private void writeError(HttpServletResponse response, int code, String msg) throws Exception {
         response.setContentType("application/json;charset=UTF-8");
-        response.setStatus(200);
+        // 认证失败 401，权限不足 403，其他按实际 code 设置
+        if (code == 401) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        } else if (code == 403) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        } else {
+            response.setStatus(HttpServletResponse.SC_OK);
+        }
         response.getWriter().write(objectMapper.writeValueAsString(R.fail(code, msg)));
     }
 }

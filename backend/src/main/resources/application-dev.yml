@@ -33,6 +33,11 @@ mq:
 jwt:
   secret: ${JWT_SECRET:zmd-order-approval-secret-key-2024-please-change-in-prod}
   expire-hours: ${JWT_EXPIRE_HOURS:24}
+  refresh-expire-days: ${JWT_REFRESH_EXPIRE_DAYS:7}
+
+# 慢 SQL 阈值（毫秒）
+slow-sql:
+  threshold-ms: ${SLOW_SQL_THRESHOLD_MS:500}
 
 # MyBatis-Plus
 mybatis-plus:

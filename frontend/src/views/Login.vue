@@ -27,7 +27,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login } from '../api/auth'
-import { setToken, setUser } from '../utils/auth'
+import { setRefreshToken, setToken, setUser } from '../utils/auth'
 
 const router = useRouter()
 const loading = ref(false)
@@ -42,6 +42,7 @@ const handleLogin = async () => {
   try {
     const res = await login(form)
     setToken(res.data.token)
+    setRefreshToken(res.data.refreshToken)
     setUser({ userId: res.data.userId, username: res.data.username, role: res.data.role })
     ElMessage.success('登录成功')
     router.push('/dashboard')

@@ -45,7 +45,7 @@ MySQL 8
 | MQ | `mq` | 审批通知生产与消费 |
 | 限流 | `rate` | 注解限流与拦截器 |
 | 定时任务 | `schedule` | 超时工单处理 |
-| 服务 | `service` | 工单、审批流、看板业务 |
+| 服务 | `service` | 工单、用户、审批流、看板业务 |
 | WebSocket | `websocket` | 实时通知 |
 
 ## 4. 前端模块
@@ -56,7 +56,7 @@ MySQL 8
 | 布局 | `frontend/src/components/Layout.vue` | 主布局与菜单 |
 | 路由 | `frontend/src/router` | 页面路由与登录守卫 |
 | 工具 | `frontend/src/utils` | 请求、认证、WebSocket |
-| 页面 | `frontend/src/views` | 登录、看板、工单、审批流页面 |
+| 页面 | `frontend/src/views` | 登录、看板、工单、审批流、用户管理页面 |
 
 ## 5. 核心链路
 

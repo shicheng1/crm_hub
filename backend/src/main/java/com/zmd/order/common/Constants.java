@@ -14,8 +14,20 @@ public interface Constants {
     String CACHE_ORDER_DETAIL = "order:cache:detail:";
     /** JWT token */
     String TOKEN_PREFIX = "order:token:";
+    /** Refresh token */
+    String REFRESH_TOKEN_PREFIX = "order:token:refresh:";
     /** 限流计数器 */
     String RATE_LIMIT_PREFIX = "order:rate:";
+
+    // ==================== 登录安全 ====================
+    /** 登录失败计数器 */
+    String LOGIN_FAIL_PREFIX = "order:login:fail:";
+    /** 账号锁定标记 */
+    String LOGIN_LOCK_PREFIX = "order:login:lock:";
+    /** 最大失败次数 */
+    int LOGIN_MAX_FAIL = 5;
+    /** 锁定时长（分钟） */
+    int LOGIN_LOCK_MINUTES = 15;
 
     // ==================== MQ 常量 ====================
     String MQ_EXCHANGE = "order.exchange";

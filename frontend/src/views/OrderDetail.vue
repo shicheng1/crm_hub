@@ -111,7 +111,7 @@ const currentStepIndex = computed(() => {
 
 // 当前用户是否可以审批
 const canApprove = computed(() => {
-  if (!order.value || user?.role !== 'APPROVER') return false
+  if (!order.value || !['ADMIN', 'APPROVER'].includes(user?.role)) return false
   if (order.value.status !== 0 && order.value.status !== 1) return false
   const step = order.value.flowSteps?.find(s => s.stepOrder === order.value.currentStep)
   if (!step) return false

@@ -71,6 +71,9 @@ public class ApprovalFlowServiceImpl implements ApprovalFlowService {
         if (flow.getSteps() != null) {
             for (ApprovalFlowStep step : flow.getSteps()) {
                 step.setFlowId(flow.getId());
+                if (step.getApproveMode() == null || step.getApproveMode().trim().isEmpty()) {
+                    step.setApproveMode("ANY");
+                }
                 stepMapper.insert(step);
                 // 保存步骤审批人
                 if (step.getApprovers() != null) {

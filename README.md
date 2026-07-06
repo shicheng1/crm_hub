@@ -162,6 +162,7 @@ cd frontend && npm run build
 | 架构文档 | `docs/architecture.md` |
 | 数据库设计 | `docs/database.md` |
 | 部署说明 | `docs/deployment.md` |
+| 用户管理需求 | `docs/user-management.md` |
 | 面试讲解稿 | `docs/interview.md` |
 | 演示脚本 | `docs/demo-script.md` |
 | 安全文档 | `docs/security.md` |

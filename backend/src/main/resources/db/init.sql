@@ -8,7 +8,8 @@ CREATE TABLE sys_user (
     id          BIGINT       PRIMARY KEY AUTO_INCREMENT,
     username    VARCHAR(50)  NOT NULL UNIQUE COMMENT '用户名',
     password    VARCHAR(100) NOT NULL COMMENT '密码',
-    role        VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '角色: USER/APPROVER',
+    role        VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '角色: USER/APPROVER/ADMIN',
+    status      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
@@ -30,7 +31,7 @@ CREATE TABLE work_order (
     INDEX idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工单表';
 
--- 初始数据
-INSERT INTO sys_user (username, password, role) VALUES ('admin', '123456', 'APPROVER');
-INSERT INTO sys_user (username, password, role) VALUES ('user1', '123456', 'USER');
-INSERT INTO sys_user (username, password, role) VALUES ('user2', '123456', 'USER');
+-- 初始数据（密码均为 BCrypt 加密的 123456）
+INSERT INTO sys_user (username, password, role, status) VALUES ('admin', '$2a$10$UufSIYKvR.buOeLGoK5Mc.kwOvigsT2rqh0T5dSynDz0Vdto9My6q', 'ADMIN', 1);
+INSERT INTO sys_user (username, password, role, status) VALUES ('user1', '$2a$10$08mG7m0DNBQNd1MHhWQ8aeXttg52Oz0LCocS2CqRDZcgHusj/rIoq', 'USER', 1);
+INSERT INTO sys_user (username, password, role, status) VALUES ('user2', '$2a$10$8Sh2GPpUxk7yPN3oID3/uudZtYE4TLtTb3oQkoXNOFQbKBJ00iHeu', 'APPROVER', 1);
