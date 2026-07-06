@@ -29,6 +29,11 @@ spring:
 mq:
   enabled: true
 
+# JWT 配置（生产环境通过环境变量覆盖）
+jwt:
+  secret: ${JWT_SECRET:zmd-order-approval-secret-key-2024-please-change-in-prod}
+  expire-hours: ${JWT_EXPIRE_HOURS:24}
+
 # MyBatis-Plus
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml

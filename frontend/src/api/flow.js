@@ -7,3 +7,7 @@ export function getFlowList() {
 export function getFlowDetail(id) {
   return request.get(`/api/flow/detail/${id}`)
 }
+
+export function createFlow(data) {
+  return request.post('/api/flow/create', data)
+}

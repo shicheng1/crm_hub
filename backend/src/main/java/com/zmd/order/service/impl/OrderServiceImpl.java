@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zmd.order.auth.LoginUser;
 import com.zmd.order.cache.OrderCacheService;
+import com.zmd.order.common.BusinessException;
 import com.zmd.order.common.Constants;
 import com.zmd.order.dto.ApprovalDTO;
 import com.zmd.order.dto.OrderCreateDTO;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -64,7 +66,7 @@ public class OrderServiceImpl implements OrderService {
         String lockKey = Constants.LOCK_ORDER_CREATE + loginUser.getUserId();
 
         boolean locked = redisLock.tryLock(lockKey, 5, 30);
-        if (!locked) throw new RuntimeException("操作过于频繁，请稍后再试");
+        if (!locked) throw new BusinessException(429, "操作过于频繁，请稍后再试");
 
         try {
             User creator = userMapper.selectById(loginUser.getUserId());
@@ -95,9 +97,9 @@ public class OrderServiceImpl implements OrderService {
     public void resubmitOrder(Long orderId) {
         LoginUser loginUser = LoginUser.get();
         WorkOrder order = orderMapper.selectById(orderId);
-        if (order == null) throw new RuntimeException("工单不存在");
-        if (!order.getCreatorId().equals(loginUser.getUserId())) throw new RuntimeException("只有创建人可以重新提交");
-        if (order.getStatus() != Constants.STATUS_RETURNED) throw new RuntimeException("该工单不在退回状态");
+        if (order == null) throw new BusinessException("工单不存在");
+        if (!order.getCreatorId().equals(loginUser.getUserId())) throw new BusinessException("只有创建人可以重新提交");
+        if (order.getStatus() != Constants.STATUS_RETURNED) throw new BusinessException("该工单不在退回状态");
 
         // 根据驳回模式决定从哪一步重新开始
         String rejectMode = getRejectMode(order);
@@ -122,20 +124,42 @@ public class OrderServiceImpl implements OrderService {
     // ==================== 查询 ====================
 
     @Override
-    public IPage<WorkOrder> pageOrders(int page, int size, Integer status) {
+    public IPage<WorkOrder> pageOrders(int page, int size, Integer status, String title) {
         LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<>();
         if (status != null) wrapper.eq(WorkOrder::getStatus, status);
+        if (title != null && !title.trim().isEmpty()) {
+            wrapper.like(WorkOrder::getTitle, title.trim());
+        }
         wrapper.orderByDesc(WorkOrder::getCreateTime);
-        return orderMapper.selectPage(new Page<>(page, size), wrapper);
+        IPage<WorkOrder> result = orderMapper.selectPage(new Page<>(page, size), wrapper);
+        // 批量填充创建人姓名（避免 N+1）
+        if (!result.getRecords().isEmpty()) {
+            List<Long> creatorIds = result.getRecords().stream()
+                    .map(WorkOrder::getCreatorId).distinct().collect(Collectors.toList());
+            Map<Long, String> nameMap = userMapper.selectBatchIds(creatorIds).stream()
+                    .collect(Collectors.toMap(User::getId, User::getUsername));
+            result.getRecords().forEach(o -> o.setCreatorName(nameMap.get(o.getCreatorId())));
+        }
+        return result;
     }
 
     @Override
     public WorkOrder getOrderDetail(Long orderId) {
+        // 1. 查缓存
         WorkOrder cached = orderCacheService.getCachedOrder(orderId);
         if (cached != null) return enrichOrder(cached);
 
+        // 2. 命中空值缓存（防穿透），直接返回不存在
+        if (orderCacheService.isNullCached(orderId)) {
+            throw new BusinessException("工单不存在");
+        }
+
+        // 3. 查数据库
         WorkOrder order = orderMapper.selectById(orderId);
-        if (order == null) throw new RuntimeException("工单不存在");
+        if (order == null) {
+            orderCacheService.cacheNull(orderId); // 缓存空值防穿透
+            throw new BusinessException("工单不存在");
+        }
         orderCacheService.cacheOrder(order);
         return enrichOrder(order);
     }
@@ -143,42 +167,19 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public IPage<WorkOrder> todoList(int page, int size) {
         LoginUser loginUser = LoginUser.get();
-
-        // 查出所有待审批/审批中的工单
-        List<WorkOrder> candidates = orderMapper.selectList(
-                new LambdaQueryWrapper<WorkOrder>()
-                        .in(WorkOrder::getStatus, Constants.STATUS_PENDING, Constants.STATUS_REVIEWING)
-                        .orderByDesc(WorkOrder::getCreateTime));
-
-        List<WorkOrder> myTodos = new ArrayList<>();
-        for (WorkOrder order : candidates) {
-            if (isMyTurn(order, loginUser.getUserId())) {
-                myTodos.add(enrichOrder(order));
-            }
-        }
-
-        int from = (page - 1) * size;
-        int to = Math.min(from + size, myTodos.size());
-        Page<WorkOrder> result = new Page<>(page, size, myTodos.size());
-        result.setRecords(from < myTodos.size() ? myTodos.subList(from, to) : new ArrayList<>());
+        // 一条 SQL 搞定：JOIN 步骤+审批人+审批记录，直接查出我的待办
+        IPage<WorkOrder> result = orderMapper.selectTodoPage(new Page<>(page, size), loginUser.getUserId());
+        // 补充展示信息（创建人名等）
+        result.getRecords().forEach(this::enrichOrder);
         return result;
     }
 
     @Override
     public IPage<WorkOrder> doneList(int page, int size) {
         LoginUser loginUser = LoginUser.get();
-        List<ApprovalRecord> myRecords = recordMapper.selectList(
-                new LambdaQueryWrapper<ApprovalRecord>()
-                        .eq(ApprovalRecord::getApproverId, loginUser.getUserId()));
-        if (myRecords.isEmpty()) return new Page<>(page, size);
-
-        List<Long> orderIds = myRecords.stream()
-                .map(ApprovalRecord::getOrderId).distinct().collect(Collectors.toList());
-
-        return orderMapper.selectPage(new Page<>(page, size),
-                new LambdaQueryWrapper<WorkOrder>()
-                        .in(WorkOrder::getId, orderIds)
-                        .orderByDesc(WorkOrder::getUpdateTime));
+        IPage<WorkOrder> result = orderMapper.selectDonePage(new Page<>(page, size), loginUser.getUserId());
+        result.getRecords().forEach(this::enrichOrder);
+        return result;
     }
 
     // ==================== 多级审批（核心） ====================
@@ -190,13 +191,13 @@ public class OrderServiceImpl implements OrderService {
         String lockKey = Constants.LOCK_ORDER_APPROVE + dto.getOrderId();
 
         boolean locked = redisLock.tryLock(lockKey, 5, 60);
-        if (!locked) throw new RuntimeException("该工单正在审批中，请稍后再试");
+        if (!locked) throw new BusinessException(429, "该工单正在审批中，请稍后再试");
 
         try {
             WorkOrder order = orderMapper.selectById(dto.getOrderId());
-            if (order == null) throw new RuntimeException("工单不存在");
+            if (order == null) throw new BusinessException("工单不存在");
             if (order.getStatus() != Constants.STATUS_PENDING && order.getStatus() != Constants.STATUS_REVIEWING) {
-                throw new RuntimeException("工单状态不允许审批");
+                throw new BusinessException("工单状态不允许审批");
             }
 
             // 自动进入第一步（如果还没开始审批流）
@@ -208,14 +209,14 @@ public class OrderServiceImpl implements OrderService {
 
             // 验证：当前步骤是否有此人审批权限
             ApprovalFlowStep currentStep = getStep(order.getFlowId(), order.getCurrentStep());
-            if (currentStep == null) throw new RuntimeException("审批流配置异常");
+            if (currentStep == null) throw new BusinessException("审批流配置异常");
             if (!isStepApprover(currentStep.getId(), loginUser.getUserId())) {
-                throw new RuntimeException("您不是当前步骤的审批人");
+                throw new BusinessException("您不是当前步骤的审批人");
             }
 
             // 检查是否重复审批（同一步骤同一人只能审一次）
             if (hasApproved(dto.getOrderId(), currentStep.getId(), loginUser.getUserId())) {
-                throw new RuntimeException("您已经审批过该步骤");
+                throw new BusinessException("您已经审批过该步骤");
             }
 
             // 写审批记录
@@ -255,7 +256,7 @@ public class OrderServiceImpl implements OrderService {
             log.info("工单审批完成, orderId={}", order.getId());
         } else {
             // === 跳过逻辑：如果下一步审批人和当前审批人相同，自动跳过 ===
-            nextStep = skipDuplicateApprovers(order.getFlowId(), nextStep.getStepOrder(), loginUser.getUserId());
+            nextStep = skipDuplicateApprovers(order.getId(), order.getFlowId(), nextStep.getStepOrder(), loginUser.getUserId());
 
             if (nextStep == null) {
                 // 跳过所有剩余步骤后，审批完成
@@ -358,10 +359,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /** 跳过审批人相同的连续步骤 */
-    private ApprovalFlowStep skipDuplicateApprovers(Long flowId, int fromStepOrder, Long approverId) {
+    private ApprovalFlowStep skipDuplicateApprovers(Long orderId, Long flowId, int fromStepOrder, Long approverId) {
         ApprovalFlowStep step = getStep(flowId, fromStepOrder);
-        while (step != null && isStepApprover(step.getId(), approverId) && !hasApproved(0L, step.getId(), approverId)) {
-            log.info("跳过审批人相同的步骤: flowId={}, stepOrder={}, approverId={}", flowId, step.getStepOrder(), approverId);
+        while (step != null && isStepApprover(step.getId(), approverId) && !hasApproved(orderId, step.getId(), approverId)) {
+            log.info("跳过审批人相同的步骤: orderId={}, flowId={}, stepOrder={}, approverId={}", orderId, flowId, step.getStepOrder(), approverId);
             step = getNextStep(flowId, step.getStepOrder());
         }
         return step;
@@ -403,11 +404,17 @@ public class OrderServiceImpl implements OrderService {
                     new LambdaQueryWrapper<ApprovalFlowStep>()
                             .eq(ApprovalFlowStep::getFlowId, order.getFlowId())
                             .orderByAsc(ApprovalFlowStep::getStepOrder));
-            // 加载每步的审批人
-            for (ApprovalFlowStep step : steps) {
-                step.setApprovers(stepApproverMapper.selectList(
+            // 批量加载所有步骤的审批人（避免 N+1 查询）
+            if (!steps.isEmpty()) {
+                List<Long> stepIds = steps.stream().map(ApprovalFlowStep::getId).collect(Collectors.toList());
+                List<ApprovalStepApprover> allApprovers = stepApproverMapper.selectList(
                         new LambdaQueryWrapper<ApprovalStepApprover>()
-                                .eq(ApprovalStepApprover::getStepId, step.getId())));
+                                .in(ApprovalStepApprover::getStepId, stepIds));
+                Map<Long, List<ApprovalStepApprover>> approverMap = allApprovers.stream()
+                        .collect(Collectors.groupingBy(ApprovalStepApprover::getStepId));
+                for (ApprovalFlowStep step : steps) {
+                    step.setApprovers(approverMap.getOrDefault(step.getId(), new ArrayList<>()));
+                }
             }
             order.setFlowSteps(steps);
 

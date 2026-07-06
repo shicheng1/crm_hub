@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dept")
@@ -29,11 +31,15 @@ public class DepartmentController {
     @GetMapping("/users")
     public R<List<User>> users() {
         List<User> users = userMapper.selectList(null);
+        // 批量加载部门，避免 N+1 查询
+        List<Department> depts = deptMapper.selectList(null);
+        Map<Long, String> deptNameMap = depts.stream()
+                .collect(Collectors.toMap(Department::getId, Department::getName));
+
         for (User user : users) {
-            user.setPassword(null);  // 不返回密码
+            user.setPassword(null); // 不返回密码
             if (user.getDeptId() != null) {
-                Department dept = deptMapper.selectById(user.getDeptId());
-                user.setDeptName(dept != null ? dept.getName() : "");
+                user.setDeptName(deptNameMap.getOrDefault(user.getDeptId(), ""));
             }
         }
         return R.ok(users);

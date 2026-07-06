@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +28,30 @@ public class ApprovalFlowServiceImpl implements ApprovalFlowService {
     public List<ApprovalFlow> listFlows() {
         List<ApprovalFlow> flows = flowMapper.selectList(
                 new LambdaQueryWrapper<ApprovalFlow>().eq(ApprovalFlow::getStatus, 1));
+        if (flows.isEmpty()) return flows;
+
+        // 批量加载所有流程的步骤（避免 N+1）
+        List<Long> flowIds = flows.stream().map(ApprovalFlow::getId).collect(Collectors.toList());
+        List<ApprovalFlowStep> allSteps = stepMapper.selectList(
+                new LambdaQueryWrapper<ApprovalFlowStep>()
+                        .in(ApprovalFlowStep::getFlowId, flowIds)
+                        .orderByAsc(ApprovalFlowStep::getStepOrder));
+        // 批量加载所有步骤的审批人
+        Map<Long, List<ApprovalFlowStep>> stepByFlow = allSteps.stream()
+                .collect(Collectors.groupingBy(ApprovalFlowStep::getFlowId));
+        if (!allSteps.isEmpty()) {
+            List<Long> stepIds = allSteps.stream().map(ApprovalFlowStep::getId).collect(Collectors.toList());
+            List<ApprovalStepApprover> allApprovers = stepApproverMapper.selectList(
+                    new LambdaQueryWrapper<ApprovalStepApprover>()
+                            .in(ApprovalStepApprover::getStepId, stepIds));
+            Map<Long, List<ApprovalStepApprover>> approverByStep = allApprovers.stream()
+                    .collect(Collectors.groupingBy(ApprovalStepApprover::getStepId));
+            for (ApprovalFlowStep step : allSteps) {
+                step.setApprovers(approverByStep.getOrDefault(step.getId(), java.util.Collections.emptyList()));
+            }
+        }
         for (ApprovalFlow flow : flows) {
-            flow.setSteps(loadStepsWithApprovers(flow.getId()));
+            flow.setSteps(stepByFlow.getOrDefault(flow.getId(), java.util.Collections.emptyList()));
         }
         return flows;
     }
@@ -65,10 +89,16 @@ public class ApprovalFlowServiceImpl implements ApprovalFlowService {
                 new LambdaQueryWrapper<ApprovalFlowStep>()
                         .eq(ApprovalFlowStep::getFlowId, flowId)
                         .orderByAsc(ApprovalFlowStep::getStepOrder));
-        for (ApprovalFlowStep step : steps) {
-            step.setApprovers(stepApproverMapper.selectList(
+        if (!steps.isEmpty()) {
+            List<Long> stepIds = steps.stream().map(ApprovalFlowStep::getId).collect(Collectors.toList());
+            List<ApprovalStepApprover> allApprovers = stepApproverMapper.selectList(
                     new LambdaQueryWrapper<ApprovalStepApprover>()
-                            .eq(ApprovalStepApprover::getStepId, step.getId())));
+                            .in(ApprovalStepApprover::getStepId, stepIds));
+            Map<Long, List<ApprovalStepApprover>> approverMap = allApprovers.stream()
+                    .collect(Collectors.groupingBy(ApprovalStepApprover::getStepId));
+            for (ApprovalFlowStep step : steps) {
+                step.setApprovers(approverMap.getOrDefault(step.getId(), java.util.Collections.emptyList()));
+            }
         }
         return steps;
     }

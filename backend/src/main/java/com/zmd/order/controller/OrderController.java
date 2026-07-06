@@ -33,8 +33,9 @@ public class OrderController {
 
     @GetMapping("/page")
     public R<IPage<WorkOrder>> page(PageQuery query,
-                                    @RequestParam(required = false) Integer status) {
-        return R.ok(orderService.pageOrders(query.getPage(), query.getSize(), status));
+                                    @RequestParam(required = false) Integer status,
+                                    @RequestParam(required = false) String title) {
+        return R.ok(orderService.pageOrders(query.getPage(), query.getSize(), status, title));
     }
 
     @GetMapping("/detail/{id}")

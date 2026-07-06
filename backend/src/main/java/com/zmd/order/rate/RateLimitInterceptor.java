@@ -50,10 +50,15 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 限流 key = 前缀 + 用户ID（按用户限流）
+        // 限流 key = 前缀 + 用户ID（已登录）或 IP（未登录）
         LoginUser loginUser = LoginUser.get();
-        String userId = loginUser != null ? String.valueOf(loginUser.getUserId()) : "anonymous";
-        String key = Constants.RATE_LIMIT_PREFIX + rateLimit.key() + ":" + userId;
+        String identity;
+        if (loginUser != null) {
+            identity = "u" + loginUser.getUserId();
+        } else {
+            identity = "ip" + getClientIp(request);
+        }
+        String key = Constants.RATE_LIMIT_PREFIX + rateLimit.key() + ":" + identity;
 
         long windowMs = rateLimit.windowSeconds() * 1000L;
         long now = System.currentTimeMillis();
@@ -66,13 +71,29 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                 String.valueOf(now));
 
         if (result == null || result == 0) {
-            log.warn("接口限流: key={}, userId={}, maxCount={}/{}s",
-                    rateLimit.key(), userId, rateLimit.maxCount(), rateLimit.windowSeconds());
+            log.warn("接口限流: key={}, identity={}, maxCount={}/{}s",
+                    rateLimit.key(), identity, rateLimit.maxCount(), rateLimit.windowSeconds());
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(objectMapper.writeValueAsString(R.fail(429, "请求过于频繁，请稍后再试")));
             return false;
         }
 
         return true;
+    }
+
+    /** 获取客户端真实 IP（穿透代理） */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // 多级代理取第一个
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip != null ? ip : "unknown";
     }
 }

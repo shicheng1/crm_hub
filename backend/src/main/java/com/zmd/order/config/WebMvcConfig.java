@@ -17,14 +17,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 限流拦截器（在认证之前）
-        registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/api/**");
-
-        // 认证拦截器
+        // 认证拦截器（先认证，限流器才能拿到用户ID做按用户限流）
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/auth/login");
+
+        // 限流拦截器（认证之后，按用户ID限流；未登录场景按IP限流）
+        registry.addInterceptor(rateLimitInterceptor)
+                .addPathPatterns("/api/**", "/auth/**");
     }
 
     @Override

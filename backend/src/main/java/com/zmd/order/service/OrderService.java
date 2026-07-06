@@ -7,7 +7,7 @@ import com.zmd.order.entity.WorkOrder;
 
 public interface OrderService {
     Long createOrder(OrderCreateDTO dto);
-    IPage<WorkOrder> pageOrders(int page, int size, Integer status);
+    IPage<WorkOrder> pageOrders(int page, int size, Integer status, String title);
     WorkOrder getOrderDetail(Long orderId);
     void approveOrder(ApprovalDTO dto);
     /** 退回后重新提交 */

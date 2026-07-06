@@ -39,7 +39,7 @@
               <el-tag :type="rec.result === 'APPROVED' ? 'success' : 'danger'" size="small">
                 {{ rec.result === 'APPROVED' ? '通过' : '驳回' }}
               </el-tag>
-              ID:{{ rec.approverId }}
+              {{ getApproverName(rec.approverId) }}
               <span v-if="rec.remark">（{{ rec.remark }}）</span>
             </div>
           </template>
@@ -88,6 +88,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getOrderDetail, approveOrder, resubmitOrder, getOrderLogs } from '../api/order'
+import { getUserList } from '../api/dept'
 import { getUser } from '../utils/auth'
 
 const route = useRoute()
@@ -97,6 +98,7 @@ const remark = ref('')
 const approving = ref(false)
 const resubmitting = ref(false)
 const user = getUser()
+const users = ref([])
 
 const statusText = (s) => ({ 0:'待审批', 1:'审批中', 2:'已通过', 3:'已驳回', 4:'已关闭', 5:'退回修改' }[s] || '未知')
 const statusType = (s) => ({ 0:'warning', 1:'', 2:'success', 3:'danger', 4:'info', 5:'warning' }[s] || 'info')
@@ -131,11 +133,19 @@ const getStepStatusText = (step) => {
 
 const getApproversText = (step) => {
   if (!step.approvers || step.approvers.length === 0) return '未配置'
-  return step.approvers.map(a => 'ID:' + a.userId).join('、')
+  return step.approvers.map(a => {
+    const u = users.value.find(x => x.id === a.userId)
+    return u ? u.username : ('ID:' + a.userId)
+  }).join('、')
 }
 
 const getStepRecords = (step) => {
   return (order.value?.records || []).filter(r => r.stepId === step.id)
+}
+
+const getApproverName = (approverId) => {
+  const u = users.value.find(x => x.id === approverId)
+  return u ? u.username : ('ID:' + approverId)
 }
 
 const loadOrder = async () => {
@@ -144,6 +154,15 @@ const loadOrder = async () => {
   const logRes = await getOrderLogs(route.params.id)
   logs.value = logRes.data
 }
+
+onMounted(async () => {
+  // 用户列表用于显示审批人姓名
+  try {
+    const u = await getUserList()
+    users.value = u.data
+  } catch (e) {}
+  await loadOrder()
+})
 
 const handleApprove = async (approved) => {
   approving.value = true
@@ -163,6 +182,4 @@ const handleResubmit = async () => {
     await loadOrder()
   } catch (e) {} finally { resubmitting.value = false }
 }
-
-onMounted(loadOrder)
 </script>

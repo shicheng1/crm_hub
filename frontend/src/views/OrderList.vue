@@ -9,7 +9,10 @@
 
     <el-card>
       <div style="margin-bottom: 16px; display: flex; gap: 12px;">
-        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 160px" @change="loadOrders">
+        <el-input v-model="titleSearch" placeholder="按标题搜索" clearable style="width: 220px" @keyup.enter="search" @clear="search">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 160px" @change="search">
           <el-option label="待审批" :value="0" />
           <el-option label="审批中" :value="1" />
           <el-option label="已通过" :value="2" />
@@ -17,9 +20,10 @@
           <el-option label="已关闭" :value="4" />
           <el-option label="退回修改" :value="5" />
         </el-select>
+        <el-button @click="search">查询</el-button>
       </div>
 
-      <el-table :data="orders" stripe>
+      <el-table :data="orders" stripe v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="180" />
         <el-table-column prop="status" label="状态" width="100">
@@ -30,7 +34,9 @@
         <el-table-column prop="currentStep" label="当前步骤" width="100">
           <template #default="{ row }">{{ row.currentStep || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="creatorId" label="创建人ID" width="100" />
+        <el-table-column prop="creatorName" label="创建人" width="120">
+          <template #default="{ row }">{{ row.creatorName || ('ID:' + row.creatorId) }}</template>
+        </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="100">
           <template #default="{ row }">
@@ -55,16 +61,29 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const statusFilter = ref(null)
+const titleSearch = ref('')
+const loading = ref(false)
 
 const statusText = (s) => ({ 0:'待审批', 1:'审批中', 2:'已通过', 3:'已驳回', 4:'已关闭', 5:'退回修改' }[s] || '未知')
 const statusType = (s) => ({ 0:'warning', 1:'', 2:'success', 3:'danger', 4:'info', 5:'warning' }[s] || 'info')
 
+const search = () => {
+  page.value = 1
+  loadOrders()
+}
+
 const loadOrders = async () => {
-  const params = { page: page.value, size: size.value }
-  if (statusFilter.value !== null && statusFilter.value !== '') params.status = statusFilter.value
-  const res = await getOrderPage(params)
-  orders.value = res.data.records
-  total.value = res.data.total
+  loading.value = true
+  try {
+    const params = { page: page.value, size: size.value }
+    if (statusFilter.value !== null && statusFilter.value !== '') params.status = statusFilter.value
+    if (titleSearch.value.trim()) params.title = titleSearch.value.trim()
+    const res = await getOrderPage(params)
+    orders.value = res.data.records
+    total.value = res.data.total
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(loadOrders)

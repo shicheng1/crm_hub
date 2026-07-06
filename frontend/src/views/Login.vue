@@ -44,7 +44,7 @@ const handleLogin = async () => {
     setToken(res.data.token)
     setUser({ userId: res.data.userId, username: res.data.username, role: res.data.role })
     ElMessage.success('登录成功')
-    router.push('/orders')
+    router.push('/dashboard')
   } catch (e) {
     // 错误已在拦截器处理
   } finally {

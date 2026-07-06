@@ -1,21 +1,22 @@
 package com.zmd.order.cache;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zmd.order.common.Constants;
 import com.zmd.order.entity.WorkOrder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 工单缓存管理
  *
- * 使用 Redis Hash 结构缓存工单详情（和 CRM 项目中缓存客户类型映射一样的模式）
- * 更新时采用「先更新数据库，再删缓存」策略
+ * 使用 Redis String + JSON 序列化缓存工单详情
+ * 策略：先更新数据库，再删除缓存（Cache Aside Pattern）
+ * 防穿透：缓存空对象（短 TTL）防止恶意查询不存在的工单
  */
 @Slf4j
 @Service
@@ -23,52 +24,64 @@ import java.util.concurrent.TimeUnit;
 public class OrderCacheService {
 
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     private static final long CACHE_EXPIRE_HOURS = 2;
+    /** 空值缓存时间（秒），防止缓存穿透 */
+    private static final long NULL_CACHE_SECONDS = 60;
 
     /**
-     * 缓存工单详情（Hash 结构）
+     * 缓存工单详情
      */
     public void cacheOrder(WorkOrder order) {
         String key = Constants.CACHE_ORDER_DETAIL + order.getId();
-        HashOperations<String, String, String> hash = redisTemplate.opsForHash();
+        try {
+            String json = objectMapper.writeValueAsString(order);
+            redisTemplate.opsForValue().set(key, json, CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
+            log.debug("缓存工单详情, orderId={}", order.getId());
+        } catch (JsonProcessingException e) {
+            log.error("缓存工单序列化失败, orderId={}", order.getId(), e);
+        }
+    }
 
-        hash.put(key, "id", String.valueOf(order.getId()));
-        hash.put(key, "title", order.getTitle());
-        hash.put(key, "content", order.getContent() != null ? order.getContent() : "");
-        hash.put(key, "status", String.valueOf(order.getStatus()));
-        hash.put(key, "creatorId", String.valueOf(order.getCreatorId()));
-        hash.put(key, "approverId", order.getApproverId() != null ? String.valueOf(order.getApproverId()) : "");
-        hash.put(key, "createTime", order.getCreateTime() != null ? order.getCreateTime().toString() : "");
+    /** 空值缓存标记 */
+    private static final String NULL_MARKER = "NULL";
 
-        redisTemplate.expire(key, CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
-        log.debug("缓存工单详情, orderId={}", order.getId());
+    /**
+     * 缓存空值（防止缓存穿透）
+     */
+    public void cacheNull(Long orderId) {
+        String key = Constants.CACHE_ORDER_DETAIL + orderId;
+        redisTemplate.opsForValue().set(key, NULL_MARKER, NULL_CACHE_SECONDS, TimeUnit.SECONDS);
     }
 
     /**
-     * 从缓存获取工单（返回 null 表示缓存未命中）
+     * 判断是否命中空值缓存
+     */
+    public boolean isNullCached(Long orderId) {
+        String key = Constants.CACHE_ORDER_DETAIL + orderId;
+        String json = redisTemplate.opsForValue().get(key);
+        return NULL_MARKER.equals(json);
+    }
+
+    /**
+     * 从缓存获取工单（返回 null 表示缓存未命中或空值缓存）
      */
     public WorkOrder getCachedOrder(Long orderId) {
         String key = Constants.CACHE_ORDER_DETAIL + orderId;
-        HashOperations<String, String, String> hash = redisTemplate.opsForHash();
-
-        Map<String, String> entries = hash.entries(key);
-        if (entries == null || entries.isEmpty()) {
+        String json = redisTemplate.opsForValue().get(key);
+        if (json == null || NULL_MARKER.equals(json)) {
+            return null; // 缓存未命中或空值缓存
+        }
+        try {
+            WorkOrder order = objectMapper.readValue(json, WorkOrder.class);
+            log.debug("缓存命中, orderId={}", orderId);
+            return order;
+        } catch (JsonProcessingException e) {
+            log.error("缓存反序列化失败, orderId={}", orderId, e);
+            redisTemplate.delete(key);
             return null;
         }
-
-        WorkOrder order = new WorkOrder();
-        order.setId(Long.parseLong(entries.get("id")));
-        order.setTitle(entries.get("title"));
-        order.setContent(entries.get("content"));
-        order.setStatus(Integer.parseInt(entries.get("status")));
-        order.setCreatorId(Long.parseLong(entries.get("creatorId")));
-        String approverId = entries.get("approverId");
-        if (approverId != null && !approverId.isEmpty()) {
-            order.setApproverId(Long.parseLong(approverId));
-        }
-        log.debug("缓存命中, orderId={}", orderId);
-        return order;
     }
 
     /**

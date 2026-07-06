@@ -33,8 +33,4 @@ public interface Constants {
 
     /** 超时自动关闭时间（小时） */
     int AUTO_CLOSE_HOURS = 24;
-
-    // ==================== JWT ====================
-    String JWT_SECRET = "zmd-order-approval-secret-key-2024";
-    long JWT_EXPIRE_HOURS = 24;
 }

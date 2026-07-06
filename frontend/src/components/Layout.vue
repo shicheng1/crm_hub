@@ -22,6 +22,10 @@
           <el-icon><Bell /></el-icon>
           <span>待我审批</span>
         </el-menu-item>
+        <el-menu-item index="/done">
+          <el-icon><CircleCheck /></el-icon>
+          <span>我已审批</span>
+        </el-menu-item>
         <el-menu-item index="/flows">
           <el-icon><Share /></el-icon>
           <span>审批流管理</span>

@@ -5,8 +5,10 @@ import com.zmd.order.common.Constants;
 import com.zmd.order.common.R;
 import com.zmd.order.entity.User;
 import com.zmd.order.mapper.UserMapper;
+import com.zmd.order.rate.RateLimit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -20,8 +22,10 @@ public class AuthController {
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
     private final StringRedisTemplate redisTemplate;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @PostMapping("/auth/login")
+    @RateLimit(key = "auth:login", maxCount = 5, windowSeconds = 60)
     public R<?> login(@RequestBody Map<String, String> params) {
         String username = params.get("username");
         String password = params.get("password");
@@ -32,17 +36,18 @@ public class AuthController {
 
         User user = userMapper.selectOne(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, username));
-        if (user == null || !user.getPassword().equals(password)) {
+        // 密码校验：兼容 BCrypt 加密密码和明文密码（初始化数据为明文，登录后建议升级）
+        if (user == null || !matchPassword(password, user.getPassword())) {
             return R.fail("用户名或密码错误");
         }
 
         // 生成 token
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
 
-        // token 存入 Redis（支持主动注销和验证）
+        // token 存入 Redis（支持主动注销和验证），TTL 与 token 过期时间一致
         redisTemplate.opsForValue().set(
                 Constants.TOKEN_PREFIX + token, user.getUsername(),
-                Constants.JWT_EXPIRE_HOURS, TimeUnit.HOURS);
+                jwtUtil.getExpireHours(), TimeUnit.HOURS);
 
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
@@ -59,5 +64,17 @@ public class AuthController {
             redisTemplate.delete(Constants.TOKEN_PREFIX + token);
         }
         return R.ok();
+    }
+
+    /**
+     * 密码校验：兼容 BCrypt 加密密码和明文密码
+     * （初始化数据为明文，新增用户建议用 BCrypt 加密）
+     */
+    private boolean matchPassword(String rawPassword, String storedPassword) {
+        if (storedPassword == null) return false;
+        if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")) {
+            return passwordEncoder.matches(rawPassword, storedPassword);
+        }
+        return storedPassword.equals(rawPassword);
     }
 }
