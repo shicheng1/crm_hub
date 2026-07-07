@@ -1,6 +1,6 @@
 # CC-2026-07-07-06 锁模板化（A2 阶段二）
 
-- 状态：planning
+- 状态：done
 - 关联技术债：§7 A2（横切关注点未隔离）/ P0-3（锁释放时机早于提交）
 - 创建：2026-07-07
 - 修改人：AI
@@ -33,3 +33,9 @@
 
 ## 回滚
 - 删除 `LockTemplate.java`，`OrderServiceImpl` 还原为 `try/finally` 直调 `RedisDistributedLock`。
+
+## 执行记录
+- 新增 `lock/LockTemplate.java`：两个重载 `executeWithLock(key, waitSec, leaseSec, msg, action)`；事务内注册 `TransactionSynchronizationAdapter.afterCompletion` 在事务提交/回滚后才释放锁，异常路径立即释放（防泄漏）。
+- `OrderServiceImpl`：删 `RedisDistributedLock` 直接依赖，注入 `LockTemplate`；`createOrder`/`approveOrder` 两处 `try/finally` 锁样板收敛为 `lockTemplate.executeWithLock(...)` 调用；锁 key 前缀、wait/lease 时长、失败文案、异常语义全部不变（纯结构收敛 + 释放时机修正）。
+- 静态自检：全仓无 `redisLock` 残留引用；`RedisDistributedLock` 仅被 `LockTemplate` 调用；无测试直接依赖被删字段。
+- 验证阻塞：本地 JDK21 + Maven 损坏无法编译，待用户在 Java 8 环境 `mvn test` 验证（同此前 CC-01/02 流程）。

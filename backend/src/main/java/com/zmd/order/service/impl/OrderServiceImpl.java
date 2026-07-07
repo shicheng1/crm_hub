@@ -13,7 +13,7 @@ import com.zmd.order.dto.ApprovalOutcome;
 import com.zmd.order.dto.OrderCreateDTO;
 import com.zmd.order.entity.*;
 import com.zmd.order.event.OrderApprovalEvent;
-import com.zmd.order.lock.RedisDistributedLock;
+import com.zmd.order.lock.LockTemplate;
 import com.zmd.order.mapper.ApprovalRecordMapper;
 import com.zmd.order.mapper.OperationLogMapper;
 import com.zmd.order.mapper.OrderMapper;
@@ -47,7 +47,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserMapper userMapper;
     private final ApprovalRecordMapper recordMapper;
     private final OperationLogMapper logMapper;
-    private final RedisDistributedLock redisLock;
+    private final LockTemplate lockTemplate;
     private final OrderCacheService orderCacheService;
     private final ApprovalEngineService approvalEngine;
     private final ApplicationEventPublisher eventPublisher;
@@ -62,11 +62,8 @@ public class OrderServiceImpl implements OrderService {
     public Long createOrder(OrderCreateDTO dto) {
         LoginUser loginUser = LoginUser.get();
         String lockKey = Constants.LOCK_ORDER_CREATE + loginUser.getUserId();
-
-        boolean locked = redisLock.tryLock(lockKey, 5, 30);
-        if (!locked) throw new BusinessException(429, "操作过于频繁，请稍后再试");
-
-        try {
+        // 锁横切收敛到 LockTemplate：加锁 → 创建 → 事务提交后释放（防并发双审）
+        return lockTemplate.executeWithLock(lockKey, 5, 30, "操作过于频繁，请稍后再试", () -> {
             User creator = userMapper.selectById(loginUser.getUserId());
             WorkOrder order = new WorkOrder();
             order.setTitle(dto.getTitle());
@@ -87,9 +84,7 @@ public class OrderServiceImpl implements OrderService {
             saveLog(order.getId(), loginUser, "CREATE", "创建工单");
             log.info("创建工单, orderId={}, flowId={}", order.getId(), dto.getFlowId());
             return order.getId();
-        } finally {
-            redisLock.releaseLock(lockKey);
-        }
+        });
     }
 
     // ==================== 重新提交（被退回后） ====================
@@ -197,11 +192,8 @@ public class OrderServiceImpl implements OrderService {
     public void approveOrder(ApprovalDTO dto) {
         LoginUser loginUser = LoginUser.get();
         String lockKey = Constants.LOCK_ORDER_APPROVE + dto.getOrderId();
-
-        boolean locked = redisLock.tryLock(lockKey, 5, 60);
-        if (!locked) throw new BusinessException(429, "该工单正在审批中，请稍后再试");
-
-        try {
+        // 锁横切收敛到 LockTemplate：加锁 → 审批编排 → 事务提交后释放（防并发双审 / 读脏状态）
+        lockTemplate.executeWithLock(lockKey, 5, 60, "该工单正在审批中，请稍后再试", () -> {
             WorkOrder order = orderMapper.selectById(dto.getOrderId());
             if (order == null) throw new BusinessException("工单不存在");
             if (order.getStatus() != Constants.STATUS_PENDING && order.getStatus() != Constants.STATUS_REVIEWING) {
@@ -275,9 +267,7 @@ public class OrderServiceImpl implements OrderService {
 
             log.info("工单审批处理完成, orderId={}, result={}, targetStatus={}",
                     order.getId(), outcome.getLogOp(), outcome.getTargetStatus());
-        } finally {
-            redisLock.releaseLock(lockKey);
-        }
+        });
     }
 
     // ==================== 内部工具方法 ====================
