@@ -85,13 +85,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getOrderDetail, approveOrder, resubmitOrder, getOrderLogs } from '../api/order'
 import { getUserDict } from '../utils/userDict'
 import { getUser } from '../utils/auth'
 
 const route = useRoute()
+const router = useRouter()
 const order = ref(null)
 const logs = ref([])
 const remark = ref('')
@@ -169,7 +170,8 @@ const handleApprove = async (approved) => {
     await approveOrder({ orderId: order.value.id, approved, remark: remark.value })
     ElMessage.success(approved ? '审批通过' : '已驳回')
     remark.value = ''
-    await loadOrder()
+    // 业务流转完成：跳转「待我审批」继续处理后续工单，目标列表挂载即拉取最新状态
+    router.push('/todo')
   } catch (e) {} finally { approving.value = false }
 }
 
@@ -178,7 +180,8 @@ const handleResubmit = async () => {
   try {
     await resubmitOrder(order.value.id)
     ElMessage.success('重新提交成功')
-    await loadOrder()
+    // 重提后工单重新进入审批流：跳转「工单列表」查看流转状态
+    router.push('/orders')
   } catch (e) {} finally { resubmitting.value = false }
 }
 </script>

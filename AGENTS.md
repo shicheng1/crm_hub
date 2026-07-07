@@ -135,6 +135,7 @@ cd frontend && npm run build
 | CC-2026-07-07-02 | 2026-07-07 | 架构解耦重构（拆审批引擎 + 领域事件解耦缓存/通知，搭骨架） | [docs/changes/CC-2026-07-07-02-arch-refactor.md](docs/changes/CC-2026-07-07-02-arch-refactor.md) | `done` | §7 A1/A2/A3 |
 | CC-2026-07-07-03 | 2026-07-07 | 前端优化改造（request 挂起修复/用户字典缓存/死代码/row-key/WebSocket 健壮/GET 去重） | [docs/changes/CC-2026-07-07-03-frontend-opt.md](docs/changes/CC-2026-07-07-03-frontend-opt.md) | `done` | §7 前端技术债 |
 | CC-2026-07-07-04 | 2026-07-07 | 后端收尾（api.md 补 /auth/refresh + 债项复核） | [docs/changes/CC-2026-07-07-04-backend-doc.md](docs/changes/CC-2026-07-07-04-backend-doc.md) | `done` | §7 P2-3 |
+| CC-2026-07-07-05 | 2026-07-07 | 前端业务流转后视图刷新与跳转（orderBus 总线 + 列表/看板自动重拉 + 详情操作后跳转对应列表） | [docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md](docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md) | `done` | §7 F-P3 |
 
 ---
 
@@ -229,6 +230,7 @@ BASE_URL=http://localhost:8080 USERNAME=admin PASSWORD=123456 k6 run docs/perfor
 | F-P2-3 | 四个 `el-table` 缺 `row-key` | `OrderList/TodoList/DoneList/UserManage` | `[FIXED]` 已补 `row-key="id"` |
 | F-P2-4 | WebSocket 通知数组无上限 + 重连无退避/无 UI 提示 | `Layout.vue:117` `websocket.js:23-54` | `[FIXED]` 上限 50 + 指数退避 + 断线提示 |
 | F-P2-5 | 路由切换重复拉取相同 GET（无缓存/去重层） | 全局（无 in-memory 缓存） | `[FIXED]` `request.js` 加 GET 并发去重 |
+| F-P3 | 业务流转后视图不刷新 / 不跳转：WS 审批通知仅更新铃铛不联动列表/看板；详情页审批/重提后只原地刷新不跳转到对应列表 | `Layout.vue` onMessage / `OrderDetail.vue` handleApprove·handleResubmit / `TodoList`·`DoneList`·`OrderList`·`Dashboard` | `[FIXED]` 新增 [`orderBus.js`](frontend/src/utils/orderBus.js) 总线 + 列表/看板 `watch` 自动重拉；详情操作后 `router.push` 到 `/todo`·`/orders`；`DoneList` 补刷新按钮与 `loading` |
 
 ## 8. 文档索引（现有 docs，勿重复造轮子）
 | 文档 | 路径（点击跳转） |

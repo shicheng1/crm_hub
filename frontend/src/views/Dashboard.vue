@@ -66,9 +66,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { CircleCheck, DataAnalysis, Document, Timer } from '@element-plus/icons-vue'
 import { getStats, getTrend } from '../api/dashboard'
+import { orderBus } from '../utils/orderBus'
 
 const stats = ref({})
 const trend = ref({})
@@ -99,11 +100,15 @@ const barHeight = (val) => {
   return Math.max(6, (Number(val || 0) / trendMax.value) * 148)
 }
 
-onMounted(async () => {
+const loadDashboard = async () => {
   const [s, t] = await Promise.all([getStats(), getTrend()])
   stats.value = s.data
   trend.value = t.data
-})
+}
+
+onMounted(loadDashboard)
+// 业务流转（他人审批/创建等）经 WebSocket 推送到总线后，自动刷新看板统计
+watch(() => orderBus.revision, loadDashboard)
 </script>
 
 <style scoped>

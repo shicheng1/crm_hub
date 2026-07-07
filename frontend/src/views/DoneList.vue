@@ -1,6 +1,9 @@
 <template>
   <div>
-    <h3>我已审批</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h3>我已审批</h3>
+      <el-button :icon="Refresh" @click="load" :loading="loading">刷新</el-button>
+    </div>
     <el-card>
       <el-table :data="orders" stripe row-key="id">
         <el-table-column prop="id" label="ID" width="80" />
@@ -27,21 +30,31 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { Refresh } from '@element-plus/icons-vue'
 import { getDoneList } from '../api/order'
+import { orderBus } from '../utils/orderBus'
 
 const orders = ref([])
 const page = ref(1)
 const total = ref(0)
+const loading = ref(false)
 
 const statusText = (s) => ({ 0:'待审批', 1:'审批中', 2:'已通过', 3:'已驳回', 4:'已关闭', 5:'退回修改' }[s] || '未知')
 const statusType = (s) => ({ 0:'warning', 1:'', 2:'success', 3:'danger', 4:'info', 5:'warning' }[s] || 'info')
 
 const load = async () => {
-  const res = await getDoneList({ page: page.value, size: 10 })
-  orders.value = res.data.records
-  total.value = res.data.total
+  loading.value = true
+  try {
+    const res = await getDoneList({ page: page.value, size: 10 })
+    orders.value = res.data.records
+    total.value = res.data.total
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(load)
+// 业务流转（他人审批/创建等）经 WebSocket 推送到总线后，自动重新拉取已办
+watch(() => orderBus.revision, load)
 </script>

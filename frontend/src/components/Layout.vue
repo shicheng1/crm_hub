@@ -92,6 +92,7 @@ import { useRouter } from 'vue-router'
 import { getUser, removeToken } from '../utils/auth'
 import { logout } from '../api/auth'
 import { connectWebSocket, disconnectWebSocket } from '../utils/websocket'
+import { bumpOrderChange } from '../utils/orderBus'
 
 const router = useRouter()
 const user = getUser()
@@ -120,6 +121,8 @@ onMounted(() => connectWebSocket((payload) => {
     notifications.value = notifications.value.slice(0, 50)
   }
   unreadCount.value++
+  // 业务流转（他人审批/创建等）广播到变更总线，当前打开的列表/看板自动刷新
+  bumpOrderChange()
 }))
 onUnmounted(() => disconnectWebSocket())
 </script>

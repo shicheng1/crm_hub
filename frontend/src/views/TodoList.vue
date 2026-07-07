@@ -32,9 +32,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { getTodoList } from '../api/order'
+import { orderBus } from '../utils/orderBus'
 
 const orders = ref([])
 const page = ref(1)
@@ -53,4 +54,6 @@ const load = async () => {
 }
 
 onMounted(load)
+// 业务流转（他人审批/创建等）经 WebSocket 推送到总线后，自动重新拉取待办
+watch(() => orderBus.revision, load)
 </script>

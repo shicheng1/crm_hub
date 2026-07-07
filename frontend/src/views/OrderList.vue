@@ -53,8 +53,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { getOrderPage } from '../api/order'
+import { orderBus } from '../utils/orderBus'
 
 const orders = ref([])
 const page = ref(1)
@@ -87,4 +88,6 @@ const loadOrders = async () => {
 }
 
 onMounted(loadOrders)
+// 业务流转（他人审批/创建等）经 WebSocket 推送到总线后，自动重新拉取工单列表
+watch(() => orderBus.revision, loadOrders)
 </script>
