@@ -19,9 +19,9 @@ import java.util.Properties;
  *
  * <p>超过阈值的 SQL 会输出 WARN 日志，配合 traceId 可定位接口链路。
  *
- * <p>由 {@link MybatisPlusConfig#registerSlowSqlInterceptor()} 在容器启动后
- * <b>显式</b>注册到 MyBatis 拦截器链，不依赖框架自动收集 {@code @Component} 的
- * Interceptor bean，避免隐式行为、意图更明确。
+ * <p>作为 {@code @Bean} 在 {@link MybatisPlusConfig#slowSqlInterceptor()} 中显式声明，
+ * 由 MyBatis-Plus 自动配置收集所有 {@code Interceptor} 类型的 bean 挂入
+ * SqlSessionFactory 的插件链，注册来源明确、无循环依赖。
  *
  * <p>注意：未改用 MyBatis-Plus 的 {@code InnerInterceptor}，因为 3.5.x 的
  * {@code InnerInterceptor} 只有 before* 前置钩子、没有 after 钩子，无法包裹

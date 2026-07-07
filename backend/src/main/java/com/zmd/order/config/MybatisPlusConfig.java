@@ -4,9 +4,6 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,19 +13,17 @@ import org.springframework.context.annotation.Configuration;
  *
  * <ul>
  *     <li>分页插件：让 selectPage 真正生效（不加则返回全量数据）</li>
- *     <li>慢 SQL 拦截器：容器启动后由 {@link #registerSlowSqlInterceptor()} 显式注册，
- *     不依赖框架自动收集 bean</li>
+ *     <li>慢 SQL 拦截器：在本配置类中以 {@code @Bean} 显式声明，与分页拦截器并排；
+ *     由 MyBatis-Plus 自动配置收集所有 {@code Interceptor} 类型的 bean 挂入
+ *     SqlSessionFactory，注册意图明确且无循环依赖。</li>
  * </ul>
  */
 @Slf4j
 @Configuration
-public class MybatisPlusConfig implements InitializingBean {
+public class MybatisPlusConfig {
 
     @Value("${slow-sql.threshold-ms:500}")
     private long slowSqlThresholdMs;
-
-    @Autowired
-    private SqlSessionFactory sqlSessionFactory;
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
@@ -40,24 +35,18 @@ public class MybatisPlusConfig implements InitializingBean {
         return interceptor;
     }
 
-    @Override
-    public void afterPropertiesSet() {
-        registerSlowSqlInterceptor();
-    }
-
     /**
-     * 显式将慢 SQL 拦截器注册到 MyBatis 拦截器链。
+     * 慢 SQL 拦截器（原生 Interceptor，包裹 Executor 计时）。
      *
-     * <p>不依赖框架自动收集 {@code @Component} 的 Interceptor bean，避免隐式行为；
-     * 通过类型判定幂等，防止热重启等场景重复注册。
+     * <p>未改用 MyBatis-Plus 的 {@code InnerInterceptor}，因为 3.5.x 的
+     * {@code InnerInterceptor} 只有 before* 前置钩子、没有 after 钩子，无法包裹
+     * 整个 SQL 执行来计时。慢 SQL 的核心价值就是计时，故保留原生 Interceptor。
+     *
+     * <p>作为 {@code @Bean} 声明在此处，MyBatis-Plus 自动配置会将其收集进
+     * SqlSessionFactory 的插件链（等价于之前的自动收集，但来源更明确）。
      */
-    public void registerSlowSqlInterceptor() {
-        org.apache.ibatis.session.Configuration configuration = sqlSessionFactory.getConfiguration();
-        boolean alreadyRegistered = configuration.getInterceptors().stream()
-                .anyMatch(i -> i instanceof SlowSqlInterceptor);
-        if (!alreadyRegistered) {
-            configuration.addInterceptor(new SlowSqlInterceptor(slowSqlThresholdMs));
-            log.info("慢SQL拦截器已显式注册, threshold={}ms", slowSqlThresholdMs);
-        }
+    @Bean
+    public SlowSqlInterceptor slowSqlInterceptor() {
+        return new SlowSqlInterceptor(slowSqlThresholdMs);
     }
 }
