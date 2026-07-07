@@ -1,14 +1,19 @@
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3>我已审批</h3>
+    <PageHeader title="我已审批" subtitle="你已处理完成的审批任务记录">
       <el-button :icon="Refresh" @click="load" :loading="loading">刷新</el-button>
-    </div>
+    </PageHeader>
+
     <el-card>
       <el-table :data="orders" stripe row-key="id">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="92">
+          <template #default="{ row }"><span class="id-cell">#{{ row.id }}</span></template>
+        </el-table-column>
         <el-table-column prop="title" label="标题" min-width="200" />
-        <el-table-column prop="creatorName" label="创建人" width="100" />
+        <el-table-column prop="flowName" label="审批流程" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="creatorName" label="创建人" width="120">
+          <template #default="{ row }">{{ row.creatorName || ('用户#' + row.creatorId) }}</template>
+        </el-table-column>
         <el-table-column prop="currentStep" label="当前步骤" width="100" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -21,8 +26,11 @@
             <el-button type="primary" link @click="$router.push(`/orders/${row.id}`)">查看</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty :image-size="60" description="暂无已办记录" />
+        </template>
       </el-table>
-      <el-pagination style="margin-top: 16px; justify-content: flex-end;"
+      <el-pagination class="pager"
           v-model:current-page="page" :total="total" :page-size="10"
           layout="total, prev, pager, next" @current-change="load" />
     </el-card>
@@ -32,6 +40,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
+import PageHeader from '../components/PageHeader'
 import { getDoneList } from '../api/order'
 import { orderBus } from '../utils/orderBus'
 

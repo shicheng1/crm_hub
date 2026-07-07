@@ -1,11 +1,10 @@
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-      <h3>用户管理</h3>
+    <PageHeader title="用户管理" subtitle="管理系统用户、角色、部门与账号状态">
       <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新建用户</el-button>
-    </div>
+    </PageHeader>
 
-    <el-card style="margin-bottom: 16px;">
+    <div class="toolbar-card">
       <el-form :inline="true" :model="query">
         <el-form-item label="用户名">
           <el-input v-model="query.username" placeholder="用户名" clearable />
@@ -33,11 +32,13 @@
           <el-button @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
+    </div>
 
     <el-card>
       <el-table :data="users" v-loading="loading" border row-key="id">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="92">
+          <template #default="{ row }"><span class="id-cell">#{{ row.id }}</span></template>
+        </el-table-column>
         <el-table-column prop="username" label="用户名" min-width="140" />
         <el-table-column label="角色" width="120">
           <template #default="{ row }">
@@ -60,9 +61,11 @@
             </el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty :image-size="60" description="暂无用户" />
+        </template>
       </el-table>
-      <div style="margin-top: 16px; text-align: right;">
-        <el-pagination
+      <el-pagination class="pager"
           v-model:current-page="query.page"
           v-model:page-size="query.size"
           :total="total"
@@ -71,7 +74,6 @@
           @size-change="loadUsers"
           @current-change="loadUsers"
         />
-      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑用户' : '新建用户'" width="520px">
@@ -130,6 +132,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getDeptList } from '../api/dept'
 import { createUser, getUserPage, resetUserPassword, updateUser, updateUserStatus } from '../api/user'
+import PageHeader from '../components/PageHeader'
 
 const loading = ref(false)
 const submitting = ref(false)

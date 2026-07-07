@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h3>创建工单</h3>
+    <PageHeader title="创建工单" subtitle="填写工单信息并提交至审批流" />
     <el-card style="max-width: 600px;">
       <el-form :model="form" label-width="100px">
         <el-form-item label="审批流程" required>
@@ -32,6 +32,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { createOrder } from '../api/order'
 import { getFlowList } from '../api/flow'
+import PageHeader from '../components/PageHeader'
 
 const router = useRouter()
 const loading = ref(false)

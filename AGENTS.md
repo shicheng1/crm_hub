@@ -138,6 +138,7 @@ cd frontend && npm run build
 | CC-2026-07-07-05 | 2026-07-07 | 前端业务流转后视图刷新与跳转（orderBus 总线 + 列表/看板自动重拉 + 详情操作后跳转对应列表） | [docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md](docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md) | `done` | §7 F-P3 |
 | CC-2026-07-07-06 | 2026-07-07 | 锁模板化（A2 阶段二：抽 LockTemplate 隔离锁横切 + 修正释放早于提交） | [docs/changes/CC-2026-07-07-06-lock-templating.md](docs/changes/CC-2026-07-07-06-lock-templating.md) | `done` | §7 A2 / P0-3 |
 | CC-2026-07-07-07 | 2026-07-07 | 收口 observability 分支 WIP（审查 6dcaf70 杂项 + 修复 Login 双触发 + seed 兼容性核对 + 文档） | [docs/changes/CC-2026-07-07-07-observability-wip-closeout.md](docs/changes/CC-2026-07-07-07-observability-wip-closeout.md) | `done` | 杂项验证 |
+| CC-2026-07-07-08 | 2026-07-07 | 前端整体展示 / 交互效果 / ID→文字 优化（落地既有 app.css 设计系统 + userDict 兜底 + 路由过渡 + 空状态） | [docs/changes/CC-2026-07-07-08-frontend-ui-polish.md](docs/changes/CC-2026-07-07-08-frontend-ui-polish.md) | `done` | §7 前端 F-P4 |
 
 ---
 
@@ -233,6 +234,7 @@ BASE_URL=http://localhost:8080 USERNAME=admin PASSWORD=123456 k6 run docs/perfor
 | F-P2-4 | WebSocket 通知数组无上限 + 重连无退避/无 UI 提示 | `Layout.vue:117` `websocket.js:23-54` | `[FIXED]` 上限 50 + 指数退避 + 断线提示 |
 | F-P2-5 | 路由切换重复拉取相同 GET（无缓存/去重层） | 全局（无 in-memory 缓存） | `[FIXED]` `request.js` 加 GET 并发去重 |
 | F-P3 | 业务流转后视图不刷新 / 不跳转：WS 审批通知仅更新铃铛不联动列表/看板；详情页审批/重提后只原地刷新不跳转到对应列表 | `Layout.vue` onMessage / `OrderDetail.vue` handleApprove·handleResubmit / `TodoList`·`DoneList`·`OrderList`·`Dashboard` | `[FIXED]` 新增 [`orderBus.js`](frontend/src/utils/orderBus.js) 总线 + 列表/看板 `watch` 自动重拉；详情操作后 `router.push` 到 `/todo`·`/orders`；`DoneList` 补刷新按钮与 `loading` |
+| F-P4 | 展示层未落地既有设计系统 + 兜底显示裸 ID：列表/详情内联 `<h3>`+裸 `<el-card>`，`app.css` 设计 token 完全未采用；`('ID:'+id)`/`nameOf` 兜底显示裸数字 | 全部 view / `app.css` / [`userDict.js`](frontend/src/utils/userDict.js) | `[FIXED]`（[CC-2026-07-07-08](docs/changes/CC-2026-07-07-08-frontend-ui-polish.md)，`npm run build` 通过） |
 
 ## 8. 文档索引（现有 docs，勿重复造轮子）
 | 文档 | 路径（点击跳转） |

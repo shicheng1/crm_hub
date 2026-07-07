@@ -1,11 +1,10 @@
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-      <h3>审批流管理</h3>
+    <PageHeader title="审批流管理" subtitle="配置多级审批步骤、审批人与驳回策略">
       <el-button type="primary" @click="openCreate">
         <el-icon><Plus /></el-icon> 新建审批流
       </el-button>
-    </div>
+    </PageHeader>
 
     <el-card v-for="flow in flows" :key="flow.id" style="margin-bottom: 16px;">
       <template #header>
@@ -77,6 +76,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getFlowList, createFlow } from '../api/flow'
 import { getUserDict } from '../utils/userDict'
+import PageHeader from '../components/PageHeader'
 
 const flows = ref([])
 const users = ref([])
@@ -89,7 +89,7 @@ const formatApprovers = (step) => {
   const separator = step.approveMode === 'ALL' ? ' 且 ' : ' 或 '
   return step.approvers.map(a => {
     const u = users.value.find(x => x.id === a.userId)
-    return u ? u.username : ('ID:' + a.userId)
+    return u ? u.username : ('用户#' + a.userId)
   }).join(separator)
 }
 

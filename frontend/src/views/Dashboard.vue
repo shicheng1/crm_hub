@@ -14,7 +14,7 @@
             <el-icon><component :is="card.icon" /></el-icon>
           </div>
           <div>
-            <div class="stat-card__value">{{ stats[card.key] || 0 }}</div>
+            <div class="stat-card__value">{{ display[card.key] || 0 }}</div>
             <div class="stat-card__label">{{ card.label }}</div>
           </div>
         </div>
@@ -66,13 +66,32 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { CircleCheck, DataAnalysis, Document, Timer } from '@element-plus/icons-vue'
 import { getStats, getTrend } from '../api/dashboard'
 import { orderBus } from '../utils/orderBus'
 
 const stats = ref({})
 const trend = ref({})
+// 看板数字 count-up（easeOutCubic），数据刷新时从旧值平滑过渡到新值
+const display = reactive({ total: 0, todayNew: 0, pending: 0, todayApproved: 0 })
+
+const animateTo = (target) => {
+  const start = { ...display }
+  const duration = 600
+  const t0 = performance.now()
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / duration)
+    const e = 1 - Math.pow(1 - p, 3)
+    for (const k of Object.keys(target)) {
+      const from = start[k] || 0
+      const to = Number(target[k]) || 0
+      display[k] = Math.round(from + (to - from) * e)
+    }
+    if (p < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
 
 const cards = [
   { key: 'total', label: '工单总数', icon: Document, className: 'is-blue' },
@@ -109,6 +128,8 @@ const loadDashboard = async () => {
 onMounted(loadDashboard)
 // 业务流转（他人审批/创建等）经 WebSocket 推送到总线后，自动刷新看板统计
 watch(() => orderBus.revision, loadDashboard)
+// 统计数变化触发 count-up 动画
+watch(stats, (v) => { if (v && Object.keys(v).length) animateTo(v) }, { deep: true })
 </script>
 
 <style scoped>

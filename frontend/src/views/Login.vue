@@ -1,7 +1,13 @@
 <template>
-  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
-    <el-card style="width: 400px">
-      <h2 style="text-align: center; margin-bottom: 30px;">工单审批系统</h2>
+  <div class="login-page">
+    <el-card class="login-card" shadow="never">
+      <div class="login-brand">
+        <div class="login-brand__mark">审</div>
+        <div>
+          <div class="login-brand__title">工单审批系统</div>
+          <div class="login-brand__sub">Order Flow Approval</div>
+        </div>
+      </div>
       <el-form :model="form" @submit.prevent="handleLogin">
         <el-form-item>
           <el-input v-model="form.username" placeholder="用户名" prefix-icon="User" />
@@ -15,7 +21,7 @@
           </el-button>
         </el-form-item>
       </el-form>
-      <div style="color: #999; font-size: 12px; text-align: center;">
+      <div class="login-tip">
         测试账号：admin/123456（审批人）| user1/123456（普通用户）
       </div>
     </el-card>
@@ -53,3 +59,51 @@ const handleLogin = async () => {
   }
 }
 </script>
+
+<style scoped>
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+.login-card {
+  width: 400px;
+  padding: 8px 8px 16px;
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.login-brand__mark {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--app-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 20px;
+}
+.login-brand__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--app-text);
+}
+.login-brand__sub {
+  margin-top: 2px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.login-tip {
+  color: var(--app-muted);
+  font-size: 12px;
+  text-align: center;
+  margin-top: 16px;
+}
+</style>

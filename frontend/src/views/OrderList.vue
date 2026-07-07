@@ -1,14 +1,13 @@
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-      <h3>工单列表</h3>
+    <PageHeader title="工单列表" subtitle="全部工单的创建、审批与流转记录">
       <el-button type="primary" @click="$router.push('/orders/create')">
         <el-icon><Plus /></el-icon> 创建工单
       </el-button>
-    </div>
+    </PageHeader>
 
-    <el-card>
-      <div style="margin-bottom: 16px; display: flex; gap: 12px;">
+    <div class="toolbar-card">
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
         <el-input v-model="titleSearch" placeholder="按标题搜索" clearable style="width: 220px" @keyup.enter="search" @clear="search">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
@@ -22,9 +21,13 @@
         </el-select>
         <el-button @click="search">查询</el-button>
       </div>
+    </div>
 
+    <el-card>
       <el-table :data="orders" stripe v-loading="loading" row-key="id">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="92">
+          <template #default="{ row }"><span class="id-cell">#{{ row.id }}</span></template>
+        </el-table-column>
         <el-table-column prop="title" label="标题" min-width="180" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -34,8 +37,9 @@
         <el-table-column prop="currentStep" label="当前步骤" width="100">
           <template #default="{ row }">{{ row.currentStep || '-' }}</template>
         </el-table-column>
+        <el-table-column prop="flowName" label="审批流程" min-width="140" show-overflow-tooltip />
         <el-table-column prop="creatorName" label="创建人" width="120">
-          <template #default="{ row }">{{ row.creatorName || ('ID:' + row.creatorId) }}</template>
+          <template #default="{ row }">{{ row.creatorName || ('用户#' + row.creatorId) }}</template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="100">
@@ -43,9 +47,12 @@
             <el-button type="primary" link @click="$router.push(`/orders/${row.id}`)">查看</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty :image-size="60" description="暂无工单" />
+        </template>
       </el-table>
 
-      <el-pagination style="margin-top: 16px; justify-content: flex-end;"
+      <el-pagination class="pager"
           v-model:current-page="page" v-model:page-size="size" :total="total" :page-sizes="[10,20,50]"
           layout="total, sizes, prev, pager, next" @current-change="loadOrders" @size-change="loadOrders" />
     </el-card>
@@ -54,6 +61,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import PageHeader from '../components/PageHeader'
 import { getOrderPage } from '../api/order'
 import { orderBus } from '../utils/orderBus'
 

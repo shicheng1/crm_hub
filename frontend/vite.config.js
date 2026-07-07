@@ -3,6 +3,10 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    // 允许 .vue 导入省略扩展名（与组件按需引入风格一致）
+    extensions: ['.vue', '.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
+  },
   build: {
     rollupOptions: {
       output: {

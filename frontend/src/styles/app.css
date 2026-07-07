@@ -163,3 +163,38 @@ body {
   font-size: 13px;
   color: var(--app-subtle);
 }
+
+/* 页面标题右侧操作区 */
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 分页器统一右对齐 */
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* 列表中的主键 ID：弱化为次级信息（#1001 形态、灰色小字） */
+.id-cell {
+  font-variant-numeric: tabular-nums;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+/* 路由切换过渡：淡入 + 轻微上滑 */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}

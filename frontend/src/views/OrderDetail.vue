@@ -1,9 +1,8 @@
 <template>
   <div v-if="order">
-    <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-      <h3>工单详情 #{{ order.id }}</h3>
+    <PageHeader :title="'工单详情 #' + order.id" :subtitle="order.title">
       <el-button @click="$router.back()">返回</el-button>
-    </div>
+    </PageHeader>
 
     <!-- 基本信息 -->
     <el-card style="margin-bottom: 16px;">
@@ -12,7 +11,7 @@
         <el-descriptions-item label="状态">
           <el-tag :type="statusType(order.status)">{{ statusText(order.status) }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="创建人">{{ order.creatorName || order.creatorId }}</el-descriptions-item>
+        <el-descriptions-item label="创建人">{{ order.creatorName || ('用户#' + order.creatorId) }}</el-descriptions-item>
         <el-descriptions-item label="审批流程">{{ order.flowName || '未选择' }}</el-descriptions-item>
         <el-descriptions-item label="驳回策略">
           {{ { RESTART: '回到第一步', PREVIOUS: '退回上一步', ORIGIN: '退回发起人' }[order.rejectMode] || '-' }}
@@ -90,6 +89,7 @@ import { ElMessage } from 'element-plus'
 import { getOrderDetail, approveOrder, resubmitOrder, getOrderLogs } from '../api/order'
 import { getUserDict } from '../utils/userDict'
 import { getUser } from '../utils/auth'
+import PageHeader from '../components/PageHeader'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,7 +102,7 @@ const user = getUser()
 const userDict = ref(new Map())
 const nameOf = (id) => {
   const u = userDict.value.get(id)
-  return u ? u.username : ('ID:' + id)
+  return u ? u.username : ('用户#' + id)
 }
 
 const statusText = (s) => ({ 0:'待审批', 1:'审批中', 2:'已通过', 3:'已驳回', 4:'已关闭', 5:'退回修改' }[s] || '未知')
