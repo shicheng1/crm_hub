@@ -25,4 +25,9 @@ public class DashboardController {
     public R<Map<String, Object>> trend() {
         return R.ok(dashboardService.getTrend());
     }
+
+    @GetMapping("/cache-stats")
+    public R<Map<String, Object>> cacheStats() {
+        return R.ok(dashboardService.getCacheStats());
+    }
 }

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zmd.order.common.Constants;
+import com.zmd.order.config.CacheMetrics;
 import com.zmd.order.entity.WorkOrder;
 import com.zmd.order.mapper.OrderMapper;
 import com.zmd.order.service.DashboardService;
@@ -32,6 +33,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final OrderMapper orderMapper;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final CacheMetrics cacheMetrics;
 
     private static final String STATS_CACHE_KEY = "dashboard:stats";
     private static final String TREND_CACHE_KEY = "dashboard:trend";
@@ -102,6 +104,11 @@ public class DashboardServiceImpl implements DashboardService {
         redisTemplate.delete(STATS_CACHE_KEY);
         redisTemplate.delete(TREND_CACHE_KEY);
         log.debug("看板缓存已清除");
+    }
+
+    @Override
+    public Map<String, Object> getCacheStats() {
+        return cacheMetrics.getStats();
     }
 
     private long countByStatus(int status) {

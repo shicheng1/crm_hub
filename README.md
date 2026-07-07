@@ -154,6 +154,34 @@ cd frontend && npm run build
 | user1 | 123456 | 普通用户 |
 | user2 | 123456 | 普通用户 |
 
+## 性能压测
+
+压测脚本与基准报告放在 `docs/performance/`：
+
+| 文件 | 说明 |
+|------|------|
+| `docs/performance/load-test.js` | **推荐**：k6 压测脚本（Node 生态，单二进制，登录仅执行一次避免触发限流） |
+| `docs/performance/jmeter-test-plan.jmx` | JMeter 5.x 测试计划（Setup 线程组登录一次，主线程组对看板/工单接口加压） |
+| `docs/performance/baseline-report.md` | 基准报告模板与运行说明 |
+
+### 用 k6 跑（最快）
+
+```bash
+# 安装：https://k6.io/docs/get-started/installation/
+BASE_URL=http://localhost:8080 USERNAME=admin PASSWORD=123456 k6 run docs/performance/load-test.js
+# 自定义规模
+k6 run --vus 100 --duration 3m docs/performance/load-test.js
+```
+
+### 用 JMeter 跑
+
+```bash
+jmeter -n -t docs/performance/jmeter-test-plan.jmx -l result.jtl
+jmeter -g result.jtl -o report-html   # 生成 HTML 报告
+```
+
+> ⚠️ 注意：`/api/auth/login` 有 `@RateLimit(auth:login, 5次/分钟)` 限流。两套脚本都**只在测试开始时登录一次**并复用 token。若要单独对登录接口加压，请临时调大或关闭该限流。
+
 ## 文档
 
 | 文档 | 路径 |
@@ -167,6 +195,7 @@ cd frontend && npm run build
 | 演示脚本 | `docs/demo-script.md` |
 | 安全文档 | `docs/security.md` |
 | 性能优化 | `docs/performance.md` |
+| 压测脚本 | `docs/performance/` |
 | 测试说明 | `docs/testing.md` |
 | 故障排查 | `docs/troubleshooting.md` |
 | 生产级升级路线图 | `docs/plans/production-upgrade-roadmap.md` |

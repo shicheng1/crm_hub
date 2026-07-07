@@ -3,6 +3,7 @@ package com.zmd.order.cache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zmd.order.common.Constants;
+import com.zmd.order.config.CacheMetrics;
 import com.zmd.order.entity.WorkOrder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class OrderCacheService {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final CacheMetrics cacheMetrics;
 
     private static final long CACHE_EXPIRE_HOURS = 2;
     /** 空值缓存时间（秒），防止缓存穿透 */
@@ -70,8 +72,14 @@ public class OrderCacheService {
     public WorkOrder getCachedOrder(Long orderId) {
         String key = Constants.CACHE_ORDER_DETAIL + orderId;
         String json = redisTemplate.opsForValue().get(key);
-        if (json == null || NULL_MARKER.equals(json)) {
-            return null; // 缓存未命中或空值缓存
+        if (json == null) {
+            cacheMetrics.incrementMiss();
+            return null; // 缓存未命中，需回源
+        }
+        // 命中（含空值缓存，均避免回源数据库）
+        cacheMetrics.incrementHit();
+        if (NULL_MARKER.equals(json)) {
+            return null; // 空值缓存
         }
         try {
             WorkOrder order = objectMapper.readValue(json, WorkOrder.class);
@@ -80,6 +88,7 @@ public class OrderCacheService {
         } catch (JsonProcessingException e) {
             log.error("缓存反序列化失败, orderId={}", orderId, e);
             redisTemplate.delete(key);
+            cacheMetrics.incrementMiss();
             return null;
         }
     }

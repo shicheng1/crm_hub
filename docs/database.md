@@ -83,11 +83,13 @@
 
 索引：
 
-| 索引 | 字段 |
-|------|------|
-| `idx_creator` | `creator_id` |
-| `idx_status` | `status` |
-| `idx_create_time` | `create_time` |
+| 索引 | 字段 | 说明 |
+|------|------|------|
+| `idx_creator` | `creator_id` | 创建人查询 |
+| `idx_create_time` | `create_time` | 时间排序 |
+| `idx_flow_id` | `flow_id` | 按审批流模板筛选（V6 新增） |
+| `idx_status_create` | `(status, create_time)` | 状态筛选 + 时间排序，覆盖 `status` 单列（V6 新增，替换 `idx_status`） |
+| `idx_approve_time` | `approve_time` | 审批时间范围统计（V6 新增） |
 
 ### 3.4 `approval_flow`
 
@@ -136,10 +138,11 @@
 
 索引：
 
-| 索引 | 字段 |
-|------|------|
-| `idx_step_id` | `step_id` |
-| `idx_user_id` | `user_id` |
+| 索引 | 字段 | 说明 |
+|------|------|------|
+| `idx_step_id` | `step_id` | 步骤查询 |
+| `idx_user_id` | `user_id` | 用户查询 |
+| `idx_step_user` | `(step_id, user_id)` | 当前步骤审批人校验（V6 新增） |
 
 ### 3.7 `approval_record`
 
@@ -156,9 +159,9 @@
 
 索引：
 
-| 索引 | 字段 |
-|------|------|
-| `idx_order_id` | `order_id` |
+| 索引 | 字段 | 说明 |
+|------|------|------|
+| `idx_order_step_approver` | `(order_id, step_id, approver_id)` | 审批进度、重复审批校验（V6 新增，替换 `idx_order_id`） |
 
 ### 3.8 `order_operation_log`
 
@@ -235,12 +238,29 @@ FROM approval_step_approver
 WHERE step_id IN (?, ?, ?);
 ```
 
-## 6. 后续索引优化建议
+## 6. 索引优化（已在 V6 实施）
+
+> 以下索引已通过 `db/migration/V6__add_indexes.sql` 落地（Flyway 自动执行）。
+
+| 表 | 已实施索引 | 用途 |
+|------|------|------|
+| `work_order` | `idx_flow_id (flow_id)` | 按审批流模板筛选 |
+| `work_order` | `idx_status_create (status, create_time)` | 状态筛选 + 时间排序（替换原 `idx_status`） |
+| `work_order` | `idx_approve_time (approve_time)` | 审批时间范围统计 |
+| `approval_record` | `idx_order_step_approver (order_id, step_id, approver_id)` | 审批进度、重复审批校验（替换原 `idx_order_id`） |
+| `approval_step_approver` | `idx_step_user (step_id, user_id)` | 当前步骤审批人校验 |
+
+**EXPLAIN 验证示例**（工单列表按状态+时间排序）：
+
+```sql
+EXPLAIN SELECT * FROM work_order
+WHERE status = 1 ORDER BY create_time DESC LIMIT 20;
+-- type: range, key: idx_status_create  ✅ 命中复合索引，避免 filesort
+```
+
+**尚未实施（低优先级，按需添加）**：
 
 | 表 | 建议索引 | 用途 |
 |------|------|------|
-| `work_order` | `(status, create_time)` | 状态筛选 + 时间排序 |
 | `work_order` | `(flow_id, current_step)` | 当前步骤审批查询 |
-| `approval_record` | `(order_id, step_id, approver_id)` | 重复审批校验 |
-| `approval_step_approver` | `(step_id, user_id)` | 当前步骤审批人校验 |
 | `order_operation_log` | `(order_id, operate_time)` | 工单日志时间线 |
