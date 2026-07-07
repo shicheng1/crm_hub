@@ -17,9 +17,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./backend/src/main/resources/db/v2_add_approval_flow.sql:/docker-entrypoint-initdb.d/02-approval-flow.sql:ro
-      - ./backend/src/main/resources/db/v3_multi_approver.sql:/docker-entrypoint-initdb.d/03-multi-approver.sql:ro
+      # 数据库结构由 Flyway 在应用启动时自动迁移（db/migration/V1~V7），无需挂载 SQL
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s

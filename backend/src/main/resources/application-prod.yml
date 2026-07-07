@@ -5,6 +5,10 @@ spring:
     username: ${MYSQL_USERNAME:order_app}
     password: ${MYSQL_PASSWORD:order_app_password}
 
+  flyway:
+    # 生产/容器部署为全新空库，Flyway 从 0 完整执行 V1~V7 建表
+    baseline-version: 0
+
   redis:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}

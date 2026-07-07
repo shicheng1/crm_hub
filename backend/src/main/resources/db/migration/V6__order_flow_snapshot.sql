@@ -1,5 +1,6 @@
--- v5: 工单审批流快照
--- 创建工单时保存当时的审批流配置，后续修改审批流不会影响历史工单
+-- V6: 工单审批流快照
+-- 创建工单时保存当时的审批流配置，后续修改审批流不会影响历史工单。
+-- 由 migration/V5__order_flow_snapshot.sql 合并而来，编号顺延为 V6。
 USE order_approval;
 
 CREATE TABLE IF NOT EXISTS order_flow_snapshot (

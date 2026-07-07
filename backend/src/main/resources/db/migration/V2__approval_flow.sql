@@ -1,4 +1,5 @@
--- v2: 多级审批流 + 操作日志 + 部门管理
+-- V2: 多级审批流 + 操作日志 + 部门管理
+-- 由 db/v2_add_approval_flow.sql 合并而来。
 USE order_approval;
 
 -- 部门表

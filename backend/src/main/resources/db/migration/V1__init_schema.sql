@@ -1,5 +1,5 @@
--- 工单审批系统 建表脚本
-CREATE DATABASE IF NOT EXISTS order_approval DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_general_ci;
+-- V1: 基础表结构 + 初始用户（BCrypt 密码）
+-- 由 db/init.sql 合并而来。注意：Flyway 连接已存在的数据库，故不再包含 CREATE DATABASE。
 USE order_approval;
 
 -- 用户表

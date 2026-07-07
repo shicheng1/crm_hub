@@ -87,9 +87,9 @@
 |------|------|------|
 | `idx_creator` | `creator_id` | 创建人查询 |
 | `idx_create_time` | `create_time` | 时间排序 |
-| `idx_flow_id` | `flow_id` | 按审批流模板筛选（V6 新增） |
-| `idx_status_create` | `(status, create_time)` | 状态筛选 + 时间排序，覆盖 `status` 单列（V6 新增，替换 `idx_status`） |
-| `idx_approve_time` | `approve_time` | 审批时间范围统计（V6 新增） |
+| `idx_flow_id` | `flow_id` | 按审批流模板筛选（V7 新增） |
+| `idx_status_create` | `(status, create_time)` | 状态筛选 + 时间排序，覆盖 `status` 单列（V7 新增，替换 `idx_status`） |
+| `idx_approve_time` | `approve_time` | 审批时间范围统计（V7 新增） |
 
 ### 3.4 `approval_flow`
 
@@ -142,7 +142,7 @@
 |------|------|------|
 | `idx_step_id` | `step_id` | 步骤查询 |
 | `idx_user_id` | `user_id` | 用户查询 |
-| `idx_step_user` | `(step_id, user_id)` | 当前步骤审批人校验（V6 新增） |
+| `idx_step_user` | `(step_id, user_id)` | 当前步骤审批人校验（V7 新增） |
 
 ### 3.7 `approval_record`
 
@@ -161,7 +161,7 @@
 
 | 索引 | 字段 | 说明 |
 |------|------|------|
-| `idx_order_step_approver` | `(order_id, step_id, approver_id)` | 审批进度、重复审批校验（V6 新增，替换 `idx_order_id`） |
+| `idx_order_step_approver` | `(order_id, step_id, approver_id)` | 审批进度、重复审批校验（V7 新增，替换 `idx_order_id`） |
 
 ### 3.8 `order_operation_log`
 
@@ -238,9 +238,9 @@ FROM approval_step_approver
 WHERE step_id IN (?, ?, ?);
 ```
 
-## 6. 索引优化（已在 V6 实施）
+## 6. 索引优化（已在 V7 实施）
 
-> 以下索引已通过 `db/migration/V6__add_indexes.sql` 落地（Flyway 自动执行）。
+> 以下索引已通过 `db/migration/V7__add_indexes.sql` 落地（Flyway 自动执行）。
 
 | 表 | 已实施索引 | 用途 |
 |------|------|------|

@@ -73,11 +73,7 @@
 ---
 
 ### Task P2-4：初始化密码 BCrypt 化
-**目标**：init.sql 不再保留明文密码
-
-**文件**：
-- 修改：`backend/src/main/resources/db/init.sql`
-- 新增：`backend/src/main/resources/db/migration/V2__bcrypt_passwords.sql`
+**目标**：init 数据不再保留明文密码（已落地于 `db/migration/V1__init_schema.sql`，BCrypt hash 直写种子用户，原 `V2__bcrypt_passwords.sql` 合并进 V1 后删除）
 
 **实现**：
 - 用 BCrypt 编码 `123456` 的 hash 替换明文
@@ -94,7 +90,7 @@
 - 新增：`entity/AuditLog.java`
 - 新增：`mapper/AuditLogMapper.java`
 - 新增：`service/AuditLogService.java` + `impl/AuditLogServiceImpl.java`
-- 新增：`db/migration/V3__audit_log.sql`
+- 新增：`db/migration/V4__audit_log.sql`
 - 修改：`auth/AuthController.java`（登录/登出记录）
 - 修改：`controller/UserController.java`（用户管理记录）
 - 修改：`controller/ApprovalFlowController.java`（审批流变更记录）
@@ -254,7 +250,7 @@
 **目标**：补全索引，记录 explain 分析
 
 **文件**：
-- 新增：`db/migration/V6__add_indexes.sql`
+- 新增：`db/migration/V7__add_indexes.sql`
 - 修改：`docs/database.md`（补充索引说明）
 
 **实现**：

@@ -104,12 +104,20 @@ zmd-crm/
 - Node.js 16+
 
 ### 1. 初始化数据库
+
+数据库结构现已由 **Flyway** 托管（`backend/src/main/resources/db/migration/V1~V7`），应用启动时自动建表/升级，**无需手动执行 SQL**。
+
 ```bash
-# 按顺序执行 SQL 脚本
-mysql -u root -p < backend/src/main/resources/db/init.sql
-mysql -u root -p order_approval < backend/src/main/resources/db/v2_add_approval_flow.sql
-mysql -u root -p order_approval < backend/src/main/resources/db/v3_multi_approver.sql
+# 先创建空数据库（Flyway 不会自动建库）
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS order_approval DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_general_ci;"
+
+# 全新空库：直接启动应用即可，Flyway 会自动执行 V1~V7。
+# 已有旧库（已含全部表）：先打基线，避免 Flyway 重复建表报错：
+#   mvn flyway:baseline -Dflyway.baselineVersion=7
 ```
+
+> Flyway 配置见 `application.yml`（`spring.flyway`：`baseline-on-migrate=true`、`baseline-version=7`）。
+> 若要彻底重建库，先 `DROP DATABASE order_approval` 再重建空库，并把 `baseline-version` 临时改为 `0` 后启动应用。
 
 ### 2. 启动后端
 ```bash

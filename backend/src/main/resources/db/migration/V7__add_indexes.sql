@@ -1,5 +1,6 @@
--- V6: 性能索引补全
--- 对应 docs/database.md 第 6 节「索引优化」建议项
+-- V7: 性能索引补全
+-- 对应 docs/database.md 第 6 节「索引优化」建议项。
+-- 由 migration/V6__add_indexes.sql 合并而来，编号顺延为 V7。
 USE order_approval;
 
 -- 1. 工单按审批流模板筛选（列表/统计常按 flow_id 过滤）

@@ -1,4 +1,5 @@
--- 审计日志表
+-- V4: 审计日志表
+-- 由 migration/V3__audit_log.sql 合并而来，编号顺延为 V4。
 USE order_approval;
 
 CREATE TABLE IF NOT EXISTS audit_log (

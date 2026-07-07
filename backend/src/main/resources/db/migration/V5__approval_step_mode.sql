@@ -1,4 +1,5 @@
--- v4: 步骤审批模式（或签/会签）
+-- V5: 步骤审批模式（或签/会签）
+-- 由 migration/V4__approval_step_mode.sql 合并而来，编号顺延为 V5。
 USE order_approval;
 
 ALTER TABLE approval_flow_step

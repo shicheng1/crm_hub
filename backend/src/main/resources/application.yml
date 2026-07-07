@@ -7,3 +7,12 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
+  # Flyway 数据库版本管理
+  flyway:
+    enabled: true
+    # 首次连到未执行过迁移的库时自动打基线，避免启动失败
+    baseline-on-migrate: true
+    # 现有开发库已手工建好全部表（对应 V1~V7），打基线为 7 让 Flyway 跳过这些版本
+    # 全新空库重建时，把此值临时改为 0 再启动应用
+    baseline-version: 7
+    locations: classpath:db/migration
