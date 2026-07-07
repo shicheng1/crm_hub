@@ -27,13 +27,16 @@
 - **架构重构（阶段一）已完成并验证**：审批引擎拆出 `ApprovalEngineService`，缓存失效与通知改为领域事件驱动（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md)，`done`）。已在 Java 8 环境编译验证通过。
 - **P0 性能优化已完成并验证**：看板合并查询（22→3 次 SQL）/ 列表 enrich 批量化（消灭 N+1）/ 锁内通知解耦（已由 CC-02 完成）代码已落地，已在 Java 8 环境编译验证通过（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)，`done`）。
 
-### 进行中变更
+### 修改计划索引（全部 `done`，权威明细见 [AGENTS.md §3.3](AGENTS.md)）
 | 计划 | 标题 | 状态 | 关联债 |
 |------|------|------|--------|
-| [CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) | 架构解耦重构（搭骨架） | `done` | A1/A3 已实现已验证；A2 待排期 |
-| [CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md) | P0 性能修复（后端） | `done` | P0-1 / P0-2 / P0-3（Java8 验证通过） |
+| [CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md) | P0 性能修复（后端） | `done` | P0-1 / P0-2 / P0-3 |
+| [CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) | 架构解耦重构（搭骨架） | `done` | A1 / A3 |
 | [CC-2026-07-07-03](docs/changes/CC-2026-07-07-03-frontend-opt.md) | 前端优化改造 | `done` | F-P0-1 / F-P1-1 / F-P2-1~5 |
 | [CC-2026-07-07-04](docs/changes/CC-2026-07-07-04-backend-doc.md) | 后端文档收尾 | `done` | P2-3 |
+| [CC-2026-07-07-05](docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md) | 前端业务流转刷新/跳转 | `done` | F-P3 |
+| [CC-2026-07-07-06](docs/changes/CC-2026-07-07-06-lock-templating.md) | 锁模板化（A2 收口） | `done` | A2 / P0-3 |
+| [CC-2026-07-07-07](docs/changes/CC-2026-07-07-07-observability-wip-closeout.md) | 收口 observability 分支 WIP | `done` | 杂项验证 |
 
 ### 技术债速览
 **后端**
@@ -192,7 +195,7 @@ zmd-crm/
 
 ### 环境要求
 - JDK 8+
-- MySQL 8+
+- MySQL 8.0.31（Flyway 8.5.13 兼容性钉定，见「初始化数据库」说明）
 - Redis 5+
 - RabbitMQ 3.8+（可选，可通过 `mq.enabled=false` 关闭）
 - Node.js 16+
@@ -212,6 +215,8 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS order_approval DEFAULT CHARSE
 
 > Flyway 配置见 `application.yml`（`spring.flyway`：`baseline-on-migrate=true`、`baseline-version=7`）。
 > 若要彻底重建库，先 `DROP DATABASE order_approval` 再重建空库，并把 `baseline-version` 临时改为 `0` 后启动应用。
+
+> ⚠️ **MySQL 版本钉定**：Docker Compose 中 MySQL 镜像已钉 `8.0.31`。Flyway 8.5.13（Spring Boot 2.7 托管版本）对 MySQL 小版本封顶到 8.0.31，连 `mysql:8.0`（当前拉取 8.0.41）会在启动时抛 `Unsupported Database`。升级 Flyway 到 9.x 会与 Spring Boot 2.7 的 `FlywayAutoConfiguration` 不兼容（缺 `FlywayConfigurationCustomizer`），故钉 MySQL 版本而非升级 Flyway。若自行部署 MySQL，请使用 8.0.31；改版本后需重建 `mysql_data` 卷。
 
 ### 2. 启动后端
 ```bash
@@ -255,6 +260,18 @@ cd frontend && npm run build
 | admin | 123456 | 审批人 |
 | user1 | 123456 | 普通用户 |
 | user2 | 123456 | 普通用户 |
+
+### 7. 加载测试数据（可选）
+
+`scripts/seed_test_data.sql` 提供一组幂等的演示/测试数据（新用户 + 4 套复杂审批流模板，密码统一 123456）。脚本用 `INSERT ... SELECT ... WHERE NOT EXISTS` 保证可重复执行，不会与 Flyway 初始数据冲突。
+
+```bash
+mysql -u root -p order_approval < scripts/seed_test_data.sql
+```
+
+包含的账号（密码均 123456）：`u_zhang`/`u_li`/`u_wang`/`u_zhao`/`u_qian`/`u_sun`（普通用户）、`a_techlead`/`a_tecmgr`/`a_bizlead`/`a_bizmgr`/`a_fin`/`a_vp`/`a_gm`（审批人，分布于技术部/业务部/管理层）。审批流模板：三级混合审批流-采购申请（驳回=PREVIOUS）、四级全会签流-大额合同（驳回=RESTART）、多级或签流-日常报销（驳回=ORIGIN）、双人会签+单人终审流（驳回=PREVIOUS）。
+
+> 注意：本脚本为手动数据脚本，不在 Flyway 迁移目录内，不会随应用启动自动执行。
 
 ## 性能压测
 

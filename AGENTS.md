@@ -137,6 +137,7 @@ cd frontend && npm run build
 | CC-2026-07-07-04 | 2026-07-07 | 后端收尾（api.md 补 /auth/refresh + 债项复核） | [docs/changes/CC-2026-07-07-04-backend-doc.md](docs/changes/CC-2026-07-07-04-backend-doc.md) | `done` | §7 P2-3 |
 | CC-2026-07-07-05 | 2026-07-07 | 前端业务流转后视图刷新与跳转（orderBus 总线 + 列表/看板自动重拉 + 详情操作后跳转对应列表） | [docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md](docs/changes/CC-2026-07-07-05-frontend-flow-refresh.md) | `done` | §7 F-P3 |
 | CC-2026-07-07-06 | 2026-07-07 | 锁模板化（A2 阶段二：抽 LockTemplate 隔离锁横切 + 修正释放早于提交） | [docs/changes/CC-2026-07-07-06-lock-templating.md](docs/changes/CC-2026-07-07-06-lock-templating.md) | `done` | §7 A2 / P0-3 |
+| CC-2026-07-07-07 | 2026-07-07 | 收口 observability 分支 WIP（审查 6dcaf70 杂项 + 修复 Login 双触发 + seed 兼容性核对 + 文档） | [docs/changes/CC-2026-07-07-07-observability-wip-closeout.md](docs/changes/CC-2026-07-07-07-observability-wip-closeout.md) | `done` | 杂项验证 |
 
 ---
 
