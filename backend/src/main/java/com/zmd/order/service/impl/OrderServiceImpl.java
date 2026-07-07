@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zmd.order.approval.ApprovalModeEvaluator;
 import com.zmd.order.auth.LoginUser;
 import com.zmd.order.cache.OrderCacheService;
 import com.zmd.order.common.BusinessException;
@@ -440,15 +441,13 @@ public class OrderServiceImpl implements OrderService {
                     new LambdaQueryWrapper<ApprovalStepApprover>()
                             .eq(ApprovalStepApprover::getStepId, step.getId()));
         }
-        if (approverCount == 0) {
-            return false;
-        }
         long approvedCount = recordMapper.selectCount(
                 new LambdaQueryWrapper<ApprovalRecord>()
                         .eq(ApprovalRecord::getOrderId, orderId)
                         .eq(ApprovalRecord::getStepId, step.getId())
                         .eq(ApprovalRecord::getResult, "APPROVED"));
-        return approvedCount >= approverCount;
+        String approveMode = step.getApproveMode() != null ? step.getApproveMode() : ApprovalModeEvaluator.MODE_ANY;
+        return ApprovalModeEvaluator.isStepFullyApproved(approveMode, approverCount, approvedCount);
     }
 
     /** 判断是否轮到此人审批（待办列表用） */

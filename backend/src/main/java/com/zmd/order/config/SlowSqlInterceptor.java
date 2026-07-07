@@ -11,18 +11,23 @@ import org.apache.ibatis.plugin.Plugin;
 import org.apache.ibatis.plugin.Signature;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import java.util.Properties;
 
 /**
- * MyBatis 慢 SQL 拦截器。
+ * MyBatis 慢 SQL 拦截器（原生 Interceptor，包裹 Executor 计时）。
  *
- * 超过阈值的 SQL 会输出 WARN 日志，配合 traceId 可定位接口链路。
+ * <p>超过阈值的 SQL 会输出 WARN 日志，配合 traceId 可定位接口链路。
+ *
+ * <p>由 {@link MybatisPlusConfig#registerSlowSqlInterceptor()} 在容器启动后
+ * <b>显式</b>注册到 MyBatis 拦截器链，不依赖框架自动收集 {@code @Component} 的
+ * Interceptor bean，避免隐式行为、意图更明确。
+ *
+ * <p>注意：未改用 MyBatis-Plus 的 {@code InnerInterceptor}，因为 3.5.x 的
+ * {@code InnerInterceptor} 只有 before* 前置钩子、没有 after 钩子，无法包裹
+ * 整个 SQL 执行来计时。慢 SQL 的核心价值就是计时，故保留原生 Interceptor。
  */
 @Slf4j
-@Component
 @Intercepts({
         @Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class}),
         @Signature(type = Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})
@@ -31,7 +36,7 @@ public class SlowSqlInterceptor implements Interceptor {
 
     private final long thresholdMs;
 
-    public SlowSqlInterceptor(@Value("${slow-sql.threshold-ms:500}") long thresholdMs) {
+    public SlowSqlInterceptor(long thresholdMs) {
         this.thresholdMs = thresholdMs;
     }
 
