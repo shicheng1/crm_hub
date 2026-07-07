@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -42,11 +41,6 @@ public class UserController {
                                @RequestParam(required = false) Long deptId,
                                @RequestParam(required = false) Integer status) {
         return R.ok(userService.pageUsers(query.getPage(), query.getSize(), username, role, deptId, status));
-    }
-
-    @GetMapping("/list")
-    public R<List<User>> list() {
-        return R.ok(userService.listActiveUsers());
     }
 
     @PostMapping

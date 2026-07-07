@@ -1,6 +1,10 @@
 services:
   mysql:
-    image: mysql:8.0
+    # 钉到 8.0.31：Flyway 8.5.13（Spring Boot 2.7 托管版本）对 MySQL 8.0 小版本封顶到 8.0.31，
+    # 连 8.0.32+（即 mysql:8.0 当前拉取的 8.0.41）会在启动时抛 Unsupported Database。
+    # 升级 Flyway 到 9.x 会与 Spring Boot 2.7 的 FlywayAutoConfiguration 不兼容（缺 FlywayConfigurationCustomizer），
+    # 故此处钉 MySQL 版本而非升级 Flyway。改版本后需重建 mysql_data 卷（见交付说明）。
+    image: mysql:8.0.31
     container_name: zmd-crm-mysql
     restart: unless-stopped
     environment:
