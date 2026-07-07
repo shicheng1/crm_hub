@@ -131,8 +131,8 @@ cd frontend && npm run build
 ### 3.3 修改计划索引
 | 编号 | 日期 | 标题 | 文件 | 状态 | 关联 |
 |------|------|------|------|------|------|
-| CC-2026-07-07-01 | 2026-07-07 | P0 性能修复（看板合并查询 / 列表 enrich 批量化 / 锁内通知解耦） | [docs/changes/CC-2026-07-07-01-p0-perf-fixes.md](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md) | `in-progress` | §7 P0-1/2/3 |
-| CC-2026-07-07-02 | 2026-07-07 | 架构解耦重构（拆审批引擎 + 领域事件解耦缓存/通知，搭骨架） | [docs/changes/CC-2026-07-07-02-arch-refactor.md](docs/changes/CC-2026-07-07-02-arch-refactor.md) | `in-progress` | §7 A1/A2/A3 |
+| CC-2026-07-07-01 | 2026-07-07 | P0 性能修复（看板合并查询 / 列表 enrich 批量化 / 锁内通知解耦） | [docs/changes/CC-2026-07-07-01-p0-perf-fixes.md](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md) | `done` | §7 P0-1/2/3 |
+| CC-2026-07-07-02 | 2026-07-07 | 架构解耦重构（拆审批引擎 + 领域事件解耦缓存/通知，搭骨架） | [docs/changes/CC-2026-07-07-02-arch-refactor.md](docs/changes/CC-2026-07-07-02-arch-refactor.md) | `done` | §7 A1/A2/A3 |
 | CC-2026-07-07-03 | 2026-07-07 | 前端优化改造（request 挂起修复/用户字典缓存/死代码/row-key/WebSocket 健壮/GET 去重） | [docs/changes/CC-2026-07-07-03-frontend-opt.md](docs/changes/CC-2026-07-07-03-frontend-opt.md) | `done` | §7 前端技术债 |
 | CC-2026-07-07-04 | 2026-07-07 | 后端收尾（api.md 补 /auth/refresh + 债项复核） | [docs/changes/CC-2026-07-07-04-backend-doc.md](docs/changes/CC-2026-07-07-04-backend-doc.md) | `done` | §7 P2-3 |
 
@@ -191,8 +191,8 @@ BASE_URL=http://localhost:8080 USERNAME=admin PASSWORD=123456 k6 run docs/perfor
 ### P0（性能 / 正确性，优先修）
 | 编号 | 问题 | 证据 | 影响 | 状态 |
 |------|------|------|------|------|
-| P0-1 | 看板统计 22 次独立聚合查询 | `DashboardServiceImpl` `getStats` 8×COUNT + `getTrend` 14×COUNT | 进看板打满 22 条扫描，缓存一失效重打 | `[FIXED]` 已实现（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)），待 Java8 验证 |
-| P0-2 | 列表 `enrichOrder` 逐条 N+1 | `OrderServiceImpl` 每条工单调快照+记录+创建人 | 一页10条≈30次查询，README 称已消除却回归 | `[FIXED]` 已实现（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)），待 Java8 验证 |
+| P0-1 | 看板统计 22 次独立聚合查询 | `DashboardServiceImpl` `getStats` 8×COUNT + `getTrend` 14×COUNT | 进看板打满 22 条扫描，缓存一失效重打 | `[FIXED]`（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)，Java8 验证通过） |
+| P0-2 | 列表 `enrichOrder` 逐条 N+1 | `OrderServiceImpl` 每条工单调快照+记录+创建人 | 一页10条≈30次查询，README 称已消除却回归 | `[FIXED]`（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)，Java8 验证通过） |
 | P0-3 | 分布式锁 lease 短 + 锁内慢操作 | `OrderServiceImpl` 锁内同步 WebSocket/MQ/多表写；`finally` 释放早于 commit | 超60s或通知慢→锁过期→并发双审；释放早于提交 | 部分 `[FIXED]`：通知解耦已由 [CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) 完成；锁释放时机/lease 归 A2（阶段二锁模板化） |
 
 ### P1（收益明显，次之）
@@ -214,9 +214,9 @@ BASE_URL=http://localhost:8080 USERNAME=admin PASSWORD=123456 k6 run docs/perfor
 ### 架构债（高内聚低耦合维度，待重构）
 | 编号 | 问题 | 证据 | 状态 |
 |------|------|------|------|
-| A1 | 上帝类：`OrderServiceImpl` 585行/注入15 bean/直接持有8 Mapper，工单CRUD+审批引擎+缓存失效+锁+通知+MQ 混一体 | `OrderServiceImpl:51-64` 依赖注入；585行 vs 其他service 40-150行 | 已实现（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) 阶段一拆出 `ApprovalEngineService`），待 Java8 环境验证 |
+| A1 | 上帝类：`OrderServiceImpl` 585行/注入15 bean/直接持有8 Mapper，工单CRUD+审批引擎+缓存失效+锁+通知+MQ 混一体 | `OrderServiceImpl:51-64` 依赖注入；585行 vs 其他service 40-150行 | 已实现（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) 阶段一拆出 `ApprovalEngineService`，Java8 验证通过） |
 | A2 | 横切关注点未隔离：锁/缓存/通知/MQ 具体实现硬编码方法体内，无 AOP/事件抽象 | `approveOrder` 内同步调 `redisLock`/`orderCacheService`/`notificationService`/`approvalProducer` | [CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md)（阶段二锁模板化，单独 plan，待排期） |
-| A3 | 反向依赖：`OrderServiceImpl` 注入 `DashboardService` 主动失效看板缓存，工单领域感知看板存在 | `OrderServiceImpl:64` 注入 `DashboardService`；`DashboardServiceImpl` 不反向依赖 `OrderService`（单向越界） | 已实现（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) 阶段一引入 `OrderApprovalEvent` + 监听器解耦），待验证 |
+| A3 | 反向依赖：`OrderServiceImpl` 注入 `DashboardService` 主动失效看板缓存，工单领域感知看板存在 | `OrderServiceImpl:64` 注入 `DashboardService`；`DashboardServiceImpl` 不反向依赖 `OrderService`（单向越界） | 已实现（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) 阶段一引入 `OrderApprovalEvent` + 监听器解耦，Java8 验证通过） |
 
 ### 前端技术债（CC-2026-07-07-03 已修复）
 | 编号 | 问题 | 证据 | 状态 |

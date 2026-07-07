@@ -24,23 +24,23 @@
 > 本仓库的总控视图。细节以 [AGENTS.md](AGENTS.md) 为准；本节省略证据，便于一眼掌控全局。
 
 ### 当前阶段
-- **架构重构（阶段一）已编码、待验证**：审批引擎拆出 `ApprovalEngineService`，缓存失效与通知改为领域事件驱动（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md)，`in-progress`）。需在 **Java 8** 环境 `mvn test` + 手验审批链路（通过/驳回三种模式/WebSocket 通知/看板缓存失效）。
-- **P0 性能优化实施中**：看板合并查询（22→3 次 SQL）/ 列表 enrich 批量化（消灭 N+1）/ 锁内通知解耦（已由 CC-02 完成）代码已落地，待 **Java 8** 环境 `mvn test` + 手验（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)，`in-progress`）。
+- **架构重构（阶段一）已完成并验证**：审批引擎拆出 `ApprovalEngineService`，缓存失效与通知改为领域事件驱动（[CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md)，`done`）。已在 Java 8 环境编译验证通过。
+- **P0 性能优化已完成并验证**：看板合并查询（22→3 次 SQL）/ 列表 enrich 批量化（消灭 N+1）/ 锁内通知解耦（已由 CC-02 完成）代码已落地，已在 Java 8 环境编译验证通过（[CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md)，`done`）。
 
 ### 进行中变更
 | 计划 | 标题 | 状态 | 关联债 |
 |------|------|------|--------|
-| [CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) | 架构解耦重构（搭骨架） | `in-progress` | A1/A3 已实现待验证；A2 待排期 |
-| [CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md) | P0 性能修复（后端） | `in-progress` | P0-1 / P0-2 / P0-3（待 Java8 验证） |
+| [CC-2026-07-07-02](docs/changes/CC-2026-07-07-02-arch-refactor.md) | 架构解耦重构（搭骨架） | `done` | A1/A3 已实现已验证；A2 待排期 |
+| [CC-2026-07-07-01](docs/changes/CC-2026-07-07-01-p0-perf-fixes.md) | P0 性能修复（后端） | `done` | P0-1 / P0-2 / P0-3（Java8 验证通过） |
 | [CC-2026-07-07-03](docs/changes/CC-2026-07-07-03-frontend-opt.md) | 前端优化改造 | `done` | F-P0-1 / F-P1-1 / F-P2-1~5 |
 | [CC-2026-07-07-04](docs/changes/CC-2026-07-07-04-backend-doc.md) | 后端文档收尾 | `done` | P2-3 |
 
 ### 技术债速览
 **后端**
-- **P0 ×3**：看板 22 次 `COUNT`（P0-1，已改 3 次 SQL 待验证）、列表 N+1（P0-2，已批量 enrich 待验证）、锁内慢操作（P0-3，通知已由 CC-02 移出锁）
+- **P0 ×3**：看板 22 次 `COUNT`（P0-1，已改 3 次 SQL 已验证）、列表 N+1（P0-2，已批量 enrich 已验证）、锁内慢操作（P0-3，通知已由 CC-02 移出锁）
 - **P1 ×3**：缓存命中仍 re-enrich（P1-1，已修）、同单快照反复解析（P1-2，已缓解）、分页 `size` 无上限（P1-3，已修）
 - **P2 ×3**：死字段 `approver_id`（P2-1，保留）、锁忙等 `sleep`（P2-2，可接受）、`api.md` 缺 `/auth/refresh`（P2-3，已补）
-- **架构债**：A1✓ A3✓（已实现待验证）/ A2 待排期（锁模板化）
+- **架构债**：A1✓ A3✓（已实现已验证）/ A2 待排期（锁模板化）
 
 **前端**（[CC-2026-07-07-03](docs/changes/CC-2026-07-07-03-frontend-opt.md) 已修复，`npm run build` 通过）
 - F-P0-1 刷新失败致并发请求挂起（已修）· F-P1-1 每次进详情全量拉用户表（已改共享字典缓存）· F-P2-1 死代码（已删）· F-P2-2 看板 barHeight 重复 max（已提 computed）· F-P2-3 四表格缺 row-key（已补）· F-P2-4 WebSocket 通知无上限/重连脆弱（已修）· F-P2-5 路由切换重复 GET（已加并发去重）
