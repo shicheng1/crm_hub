@@ -1,11 +1,15 @@
 <template>
-  <el-container style="height: 100vh">
+  <el-container class="app-shell">
     <!-- 侧边栏 -->
-    <el-aside width="200px" style="background: #304156;">
-      <div style="height: 50px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: bold;">
-        工单审批系统
+    <el-aside width="216px" class="app-sidebar">
+      <div class="app-logo">
+        <div class="app-logo__mark">审</div>
+        <div>
+          <div class="app-logo__title">工单审批</div>
+          <div class="app-logo__sub">Order Flow</div>
+        </div>
       </div>
-      <el-menu :default-active="$route.path" router background-color="#304156" text-color="#bfcbd9" active-text-color="#409eff">
+      <el-menu :default-active="$route.path" router class="app-menu" background-color="#182235" text-color="#cbd5e1" active-text-color="#ffffff">
         <el-menu-item index="/dashboard">
           <el-icon><DataAnalysis /></el-icon>
           <span>数据看板</span>
@@ -39,16 +43,17 @@
 
     <el-container>
       <!-- 顶部栏 -->
-      <el-header style="display: flex; align-items: center; justify-content: flex-end; background: #fff; border-bottom: 1px solid #eee;">
-        <div style="display: flex; align-items: center; gap: 16px;">
+      <el-header class="app-header">
+        <div class="app-header__title">{{ $route.meta.title || '工单审批系统' }}</div>
+        <div class="app-header__actions">
           <!-- 通知铃铛 -->
           <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99">
-            <el-icon style="font-size: 20px; cursor: pointer" @click="showNotificationPanel = !showNotificationPanel">
+            <el-icon class="notification-icon" @click="showNotificationPanel = !showNotificationPanel">
               <Bell />
             </el-icon>
           </el-badge>
-          <el-tag>{{ { ADMIN: '管理员', APPROVER: '审批人', USER: '普通用户' }[user?.role] || '普通用户' }}</el-tag>
-          <span style="font-weight: bold;">{{ user?.username }}</span>
+          <el-tag effect="plain">{{ { ADMIN: '管理员', APPROVER: '审批人', USER: '普通用户' }[user?.role] || '普通用户' }}</el-tag>
+          <span class="user-name">{{ user?.username }}</span>
           <el-button type="info" size="small" @click="handleLogout">退出</el-button>
         </div>
       </el-header>
@@ -74,7 +79,7 @@
       </el-drawer>
 
       <!-- 主内容 -->
-      <el-main style="padding: 20px; background: #f5f5f5;">
+      <el-main class="app-main">
         <router-view />
       </el-main>
     </el-container>
@@ -110,7 +115,109 @@ const formatTime = (time) => time ? time.replace('T', ' ').substring(0, 19) : ''
 
 onMounted(() => connectWebSocket((payload) => {
   notifications.value.unshift(payload)
+  // 通知列表设上限，避免长连接下无限增长占用内存
+  if (notifications.value.length > 50) {
+    notifications.value = notifications.value.slice(0, 50)
+  }
   unreadCount.value++
 }))
 onUnmounted(() => disconnectWebSocket())
 </script>
+
+<style scoped>
+.app-shell {
+  height: 100vh;
+  background: var(--app-bg);
+}
+
+.app-sidebar {
+  background: var(--app-sidebar);
+  box-shadow: 8px 0 24px rgba(15, 23, 42, 0.12);
+}
+
+.app-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-logo__mark {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--app-primary);
+  font-weight: 700;
+}
+
+.app-logo__title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.app-logo__sub {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.app-menu {
+  border-right: none;
+  padding: 10px 8px;
+}
+
+.app-menu :deep(.el-menu-item) {
+  height: 44px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.app-menu :deep(.el-menu-item.is-active) {
+  background: var(--app-sidebar-active);
+}
+
+.app-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid var(--app-border);
+  padding: 0 22px;
+}
+
+.app-header__title {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--app-text);
+}
+
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.notification-icon {
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--app-subtle);
+}
+
+.user-name {
+  font-weight: 650;
+}
+
+.app-main {
+  padding: 22px;
+  background: var(--app-bg);
+  overflow: auto;
+}
+</style>

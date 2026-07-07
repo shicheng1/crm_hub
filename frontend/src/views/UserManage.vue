@@ -36,7 +36,7 @@
     </el-card>
 
     <el-card>
-      <el-table :data="users" v-loading="loading" border>
+      <el-table :data="users" v-loading="loading" border row-key="id">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" min-width="140" />
         <el-table-column label="角色" width="120">

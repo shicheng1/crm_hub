@@ -24,3 +24,6 @@ Desktop.ini
 .env
 .env.local
 .env.*.local
+
+# Agent private data (workbuddy memory/skills, not project source)
+.workbuddy/

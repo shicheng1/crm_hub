@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zmd.order.common.Constants;
 import com.zmd.order.config.CacheMetrics;
+import com.zmd.order.dto.StatsSummary;
 import com.zmd.order.entity.WorkOrder;
 import com.zmd.order.mapper.OrderMapper;
 import com.zmd.order.service.DashboardService;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
  * 数据看板服务
  *
  * 技术亮点：Redis 缓存统计结果，5 分钟过期
+ * 性能：统计聚合已从「22 次独立 COUNT」合并为「状态分布 1 条 + 创建趋势 1 条 + 通过趋势 1 条」（P0-1）
  */
 @Slf4j
 @Service
@@ -38,6 +40,8 @@ public class DashboardServiceImpl implements DashboardService {
     private static final String STATS_CACHE_KEY = "dashboard:stats";
     private static final String TREND_CACHE_KEY = "dashboard:trend";
     private static final long CACHE_EXPIRE_MINUTES = 5;
+    private static final int TREND_DAYS = 7;
+    private static final DateTimeFormatter MM_DD = DateTimeFormatter.ofPattern("MM-dd");
 
     @Override
     public Map<String, Object> getStats() {
@@ -47,16 +51,19 @@ public class DashboardServiceImpl implements DashboardService {
             return parseMap(cached);
         }
 
+        LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+        StatsSummary s = orderMapper.selectStatsSummary(todayStart); // 单条 SQL 聚合
+
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("total", orderMapper.selectCount(null));
-        stats.put("pending", countByStatus(Constants.STATUS_PENDING));
-        stats.put("reviewing", countByStatus(Constants.STATUS_REVIEWING));
-        stats.put("approved", countByStatus(Constants.STATUS_APPROVED));
-        stats.put("rejected", countByStatus(Constants.STATUS_REJECTED));
-        stats.put("closed", countByStatus(Constants.STATUS_CLOSED));
-        stats.put("returned", countByStatus(Constants.STATUS_RETURNED));
-        stats.put("todayNew", countTodayNew());
-        stats.put("todayApproved", countTodayApproved());
+        stats.put("total", s.getTotal());
+        stats.put("pending", s.getPending());
+        stats.put("reviewing", s.getReviewing());
+        stats.put("approved", s.getApproved());
+        stats.put("rejected", s.getRejected());
+        stats.put("closed", s.getClosed());
+        stats.put("returned", s.getReturned());
+        stats.put("todayNew", s.getTodayNew());
+        stats.put("todayApproved", s.getTodayApproved());
 
         redisTemplate.opsForValue().set(STATS_CACHE_KEY, toJson(stats),
                 CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
@@ -65,29 +72,30 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public Map<String, Object> getTrend() {
+        return getTrend(TREND_DAYS);
+    }
+
+    public Map<String, Object> getTrend(int days) {
         String cached = redisTemplate.opsForValue().get(TREND_CACHE_KEY);
         if (cached != null) {
             return parseMap(cached);
         }
 
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = LocalDateTime.of(today.minusDays(days - 1), LocalTime.MIN);
+
         List<String> dates = new ArrayList<>();
-        List<Long> newCounts = new ArrayList<>();
-        List<Long> approveCounts = new ArrayList<>();
-
-        for (int i = 6; i >= 0; i--) {
-            LocalDate date = LocalDate.now().minusDays(i);
-            dates.add(date.format(DateTimeFormatter.ofPattern("MM-dd")));
-            LocalDateTime dayStart = LocalDateTime.of(date, LocalTime.MIN);
-            LocalDateTime dayEnd = LocalDateTime.of(date, LocalTime.MAX);
-
-            newCounts.add(orderMapper.selectCount(
-                    new LambdaQueryWrapper<WorkOrder>()
-                            .between(WorkOrder::getCreateTime, dayStart, dayEnd)));
-            approveCounts.add(orderMapper.selectCount(
-                    new LambdaQueryWrapper<WorkOrder>()
-                            .eq(WorkOrder::getStatus, Constants.STATUS_APPROVED)
-                            .between(WorkOrder::getApproveTime, dayStart, dayEnd)));
+        for (int i = days - 1; i >= 0; i--) {
+            dates.add(today.minusDays(i).format(MM_DD));
         }
+
+        Map<String, Long> createMap = toCountMap(orderMapper.selectCreateTrend(start));
+        Map<String, Long> approveMap = toCountMap(orderMapper.selectApproveTrend(start));
+
+        List<Long> newCounts = dates.stream()
+                .map(d -> createMap.getOrDefault(d, 0L)).collect(Collectors.toList());
+        List<Long> approveCounts = dates.stream()
+                .map(d -> approveMap.getOrDefault(d, 0L)).collect(Collectors.toList());
 
         Map<String, Object> trend = new LinkedHashMap<>();
         trend.put("dates", dates);
@@ -111,22 +119,17 @@ public class DashboardServiceImpl implements DashboardService {
         return cacheMetrics.getStats();
     }
 
-    private long countByStatus(int status) {
-        return orderMapper.selectCount(
-                new LambdaQueryWrapper<WorkOrder>().eq(WorkOrder::getStatus, status));
-    }
-
-    private long countTodayNew() {
-        return orderMapper.selectCount(
-                new LambdaQueryWrapper<WorkOrder>()
-                        .ge(WorkOrder::getCreateTime, LocalDateTime.of(LocalDate.now(), LocalTime.MIN)));
-    }
-
-    private long countTodayApproved() {
-        return orderMapper.selectCount(
-                new LambdaQueryWrapper<WorkOrder>()
-                        .eq(WorkOrder::getStatus, Constants.STATUS_APPROVED)
-                        .ge(WorkOrder::getApproveTime, LocalDateTime.of(LocalDate.now(), LocalTime.MIN)));
+    /** 把趋势行 [{d:'MM-dd', c:count}] 转成日期→数量映射（缺日期由调用方补零） */
+    private Map<String, Long> toCountMap(List<Map<String, Object>> rows) {
+        Map<String, Long> map = new LinkedHashMap<>();
+        if (rows == null) return map;
+        for (Map<String, Object> r : rows) {
+            String d = String.valueOf(r.get("d"));
+            Object c = r.get("c");
+            long cnt = c instanceof Number ? ((Number) c).longValue() : 0L;
+            map.put(d, cnt);
+        }
+        return map;
     }
 
     private String toJson(Object obj) {

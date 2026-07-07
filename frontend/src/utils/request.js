@@ -11,9 +11,26 @@ const request = axios.create({
 let refreshing = false
 let pendingQueue = []
 
+// 并发相同 GET 请求去重：相同 method+url+params 共享同一个 Promise，避免路由切换/多组件重复拉取
+const inflight = new Map()
+
+function inflightKey(config) {
+  const { method, url, params, data } = config
+  return `${String(method || 'get').toUpperCase()}|${url}|${JSON.stringify(params || {})}|${JSON.stringify(data || {})}`
+}
+
 function resolvePendingQueue(token) {
-  pendingQueue.forEach(callback => callback(token))
+  const queue = pendingQueue
   pendingQueue = []
+  queue.forEach(callback => callback(token))
+}
+
+// 刷新失败时清空等待队列：回调收到 null 直接 reject。
+// 否则并发 401 的请求会永久 pending（P0 修复：原实现只 reject 当前请求，队列永不触发）
+function rejectPendingQueue() {
+  const queue = pendingQueue
+  pendingQueue = []
+  queue.forEach(callback => callback(null))
 }
 
 function redirectToLogin(message = '登录已过期，请重新登录') {
@@ -25,15 +42,19 @@ function redirectToLogin(message = '登录已过期，请重新登录') {
 async function tryRefreshToken(originalRequest) {
   const refreshToken = getRefreshToken()
   if (!refreshToken || originalRequest._retry) {
-    redirectToLogin()
     return Promise.reject(originalRequest)
   }
 
   originalRequest._retry = true
 
   if (refreshing) {
-    return new Promise(resolve => {
+    // 已有刷新在进行：排队，刷新成功后由 resolvePendingQueue 统一重放
+    return new Promise((resolve, reject) => {
       pendingQueue.push(token => {
+        if (!token) {
+          reject(originalRequest)
+          return
+        }
         originalRequest.headers.Authorization = 'Bearer ' + token
         resolve(request(originalRequest))
       })
@@ -44,7 +65,8 @@ async function tryRefreshToken(originalRequest) {
   try {
     const res = await axios.post('/auth/refresh', { refreshToken })
     if (res.data.code !== 200 || !res.data.data?.token) {
-      redirectToLogin(res.data.msg || '登录已过期，请重新登录')
+      rejectPendingQueue()
+      redirectToLogin(res.data?.msg || '登录已过期，请重新登录')
       return Promise.reject(res.data)
     }
     const newToken = res.data.data.token
@@ -53,6 +75,7 @@ async function tryRefreshToken(originalRequest) {
     originalRequest.headers.Authorization = 'Bearer ' + newToken
     return request(originalRequest)
   } catch (e) {
+    rejectPendingQueue()
     redirectToLogin('登录已过期，请重新登录')
     return Promise.reject(e)
   } finally {
@@ -105,5 +128,21 @@ request.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// GET 请求去重（包一层核心 request，拦截器仍生效）
+const coreRequest = request.request.bind(request)
+request.request = (config) => {
+  if (String(config.method || 'get').toUpperCase() === 'GET') {
+    const key = inflightKey(config)
+    if (inflight.has(key)) {
+      return inflight.get(key)
+    }
+    const p = coreRequest(config)
+    inflight.set(key, p)
+    p.finally(() => inflight.delete(key))
+    return p
+  }
+  return coreRequest(config)
+}
 
 export default request

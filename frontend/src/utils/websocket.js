@@ -4,6 +4,9 @@ import { getToken, getUser } from './auth'
 import { ElNotification } from 'element-plus'
 
 let stompClient = null
+let reconnectAttempts = 0
+const BASE_RECONNECT = 5000
+const MAX_RECONNECT = 30000
 
 /**
  * 连接 WebSocket（STOMP over SockJS）
@@ -20,12 +23,13 @@ export function connectWebSocket(onMessage) {
 
   stompClient = new Client({
     webSocketFactory: () => new SockJS('/ws'),
-    reconnectDelay: 5000,
+    reconnectDelay: BASE_RECONNECT,
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,
 
     onConnect: () => {
       console.log('WebSocket 已连接, userId=' + user.userId)
+      reconnectAttempts = 0
 
       // 订阅个人通知频道
       const destination = '/topic/notifications/' + user.userId
@@ -47,10 +51,27 @@ export function connectWebSocket(onMessage) {
 
     onStompError: (frame) => {
       console.error('WebSocket STOMP 错误:', frame.headers['message'])
+      ElNotification({
+        title: '实时通知异常',
+        message: '通知连接出现问题，将自动重连',
+        type: 'warning',
+        duration: 4000
+      })
     },
 
-    onDisconnect: () => {
-      console.log('WebSocket 已断开')
+    onWebSocketClose: () => {
+      reconnectAttempts++
+      // 指数退避，封顶 30s，避免网络抖动时频繁重连打满
+      stompClient.reconnectDelay = Math.min(MAX_RECONNECT, BASE_RECONNECT * Math.pow(2, reconnectAttempts))
+      console.warn(`WebSocket 已断开，第 ${reconnectAttempts} 次重连（间隔 ${stompClient.reconnectDelay}ms）`)
+      if (reconnectAttempts === 1) {
+        ElNotification({
+          title: '实时通知已断开',
+          message: '正在尝试重新连接…',
+          type: 'warning',
+          duration: 4000
+        })
+      }
     }
   })
 
@@ -62,6 +83,7 @@ export function disconnectWebSocket() {
     stompClient.deactivate()
     stompClient = null
   }
+  reconnectAttempts = 0
 }
 
 function showNotification(payload) {

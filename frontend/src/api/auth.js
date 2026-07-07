@@ -7,7 +7,3 @@ export function login(data) {
 export function logout() {
   return request.post('/auth/logout')
 }
-
-export function refreshToken(refreshToken) {
-  return request.post('/auth/refresh', { refreshToken })
-}

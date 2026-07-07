@@ -5,7 +5,7 @@
       <el-button :icon="Refresh" @click="load" :loading="loading">刷新</el-button>
     </div>
     <el-card>
-      <el-table :data="orders" stripe v-loading="loading">
+      <el-table :data="orders" stripe v-loading="loading" row-key="id">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="200" />
         <el-table-column prop="creatorName" label="创建人" width="120">

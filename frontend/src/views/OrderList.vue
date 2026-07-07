@@ -23,7 +23,7 @@
         <el-button @click="search">查询</el-button>
       </div>
 
-      <el-table :data="orders" stripe v-loading="loading">
+      <el-table :data="orders" stripe v-loading="loading" row-key="id">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="180" />
         <el-table-column prop="status" label="状态" width="100">

@@ -76,7 +76,7 @@ import { ref, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getFlowList, createFlow } from '../api/flow'
-import { getUserList } from '../api/dept'
+import { getUserDict } from '../utils/userDict'
 
 const flows = ref([])
 const users = ref([])
@@ -148,8 +148,8 @@ const submit = async () => {
 }
 
 onMounted(async () => {
-  const [f, u] = await Promise.all([getFlowList(), getUserList()])
+  const [f, dict] = await Promise.all([getFlowList(), getUserDict()])
   flows.value = f.data
-  users.value = u.data
+  users.value = Array.from(dict.values())
 })
 </script>

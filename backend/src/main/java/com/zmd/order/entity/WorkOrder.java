@@ -39,4 +39,7 @@ public class WorkOrder {
     private String flowName;
     @TableField(exist = false)
     private String rejectMode;
+    /** 是否已填充展示信息（审批记录/快照/创建人名）。命中缓存时为真，避免 re-enrich（P0-2/P1-1） */
+    @TableField(exist = false)
+    private boolean enriched;
 }

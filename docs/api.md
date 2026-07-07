@@ -61,6 +61,36 @@
 }
 ```
 
+## 刷新 Token（/auth/refresh）
+
+> 登录响应中的 `refreshToken` 用于续期。当前端 access token 过期（响应业务码 `401`）时，`request.js` 自动携带 `refreshToken` 调用本接口换取新 token；刷新失败则跳转登录页。
+
+### `POST /auth/refresh`
+
+**请求体**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `refreshToken` | 是 | 登录时返回的 refreshToken |
+
+**响应字段（成功）**
+
+| 字段 | 说明 |
+|------|------|
+| `token` | 新的 JWT access token |
+
+> 失败时返回业务码 `401`（`code: 401`，非 HTTP 401）及 `msg`，例如 `refreshToken 已过期` / `refreshToken 已失效`。
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoiYWRtaW4iLCJyb2xlIjoiQVBQUk9WRVIifQ.newSignature"
+  }
+}
+```
+
 ## 2) 登出
 
 ### `POST /auth/logout`

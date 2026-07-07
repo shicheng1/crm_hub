@@ -2,7 +2,7 @@
   <div>
     <h3>我已审批</h3>
     <el-card>
-      <el-table :data="orders" stripe>
+      <el-table :data="orders" stripe row-key="id">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="200" />
         <el-table-column prop="creatorName" label="创建人" width="100" />

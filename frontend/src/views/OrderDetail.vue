@@ -88,7 +88,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getOrderDetail, approveOrder, resubmitOrder, getOrderLogs } from '../api/order'
-import { getUserList } from '../api/dept'
+import { getUserDict } from '../utils/userDict'
 import { getUser } from '../utils/auth'
 
 const route = useRoute()
@@ -98,7 +98,11 @@ const remark = ref('')
 const approving = ref(false)
 const resubmitting = ref(false)
 const user = getUser()
-const users = ref([])
+const userDict = ref(new Map())
+const nameOf = (id) => {
+  const u = userDict.value.get(id)
+  return u ? u.username : ('ID:' + id)
+}
 
 const statusText = (s) => ({ 0:'待审批', 1:'审批中', 2:'已通过', 3:'已驳回', 4:'已关闭', 5:'退回修改' }[s] || '未知')
 const statusType = (s) => ({ 0:'warning', 1:'', 2:'success', 3:'danger', 4:'info', 5:'warning' }[s] || 'info')
@@ -133,10 +137,7 @@ const getStepStatusText = (step) => {
 
 const getApproversText = (step) => {
   if (!step.approvers || step.approvers.length === 0) return '未配置'
-  return step.approvers.map(a => {
-    const u = users.value.find(x => x.id === a.userId)
-    return u ? u.username : ('ID:' + a.userId)
-  }).join('、')
+  return step.approvers.map(a => nameOf(a.userId)).join('、')
 }
 
 const getStepRecords = (step) => {
@@ -144,8 +145,7 @@ const getStepRecords = (step) => {
 }
 
 const getApproverName = (approverId) => {
-  const u = users.value.find(x => x.id === approverId)
-  return u ? u.username : ('ID:' + approverId)
+  return nameOf(approverId)
 }
 
 const loadOrder = async () => {
@@ -156,10 +156,9 @@ const loadOrder = async () => {
 }
 
 onMounted(async () => {
-  // 用户列表用于显示审批人姓名
+  // 用户字典用于显示审批人姓名（带 TTL 缓存，避免每次进入详情页全量拉用户表）
   try {
-    const u = await getUserList()
-    users.value = u.data
+    userDict.value = await getUserDict()
   } catch (e) {}
   await loadOrder()
 })
